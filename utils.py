@@ -1,5 +1,5 @@
 from PIL import Image
-import time, os, re
+import time, os, re, sys
 import subprocess
 import signal
 from hashlib import md5
@@ -16,6 +16,19 @@ current_url = ""
 has_new_download = True
 
 busy_flag = False
+
+current_python = sys.executable
+if not current_python:
+    current_python = "python3"
+print("Using python interpreter:", current_python)
+
+if not config.custom_gallery_dl_location:
+    py_exec_path = os.path.dirname(current_python)
+    if py_exec_path and os.path.exists(os.path.join(py_exec_path, "gallery-dl")):
+        config.custom_gallery_dl_location = os.path.join(
+            py_exec_path, "gallery-dl"
+        )
+    print("Using gallery-dl location:", config.custom_gallery_dl_location)
 
 config.fs_bases["x"] = os.path.expanduser(config.fs_bases["x"])
 config.fs_bases["bsky"] = os.path.expanduser(config.fs_bases["bsky"])
@@ -200,7 +213,7 @@ class DownloadWorker(Thread):
                     else:
                         name = name.group(2).lower()
                     cmd = [
-                        "python3",
+                        current_python,
                         "./fadl/fadl.py",
                         "-o",
                         f"{config.fs_bases['fa']}/",
