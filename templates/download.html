@@ -1,0 +1,65 @@
+<div class="search_bar">
+    <input type="text" name="q" placeholder="url" id="url_input" onkeydown="execute_on_enter(event,()=>{add_url(true)})" />
+    <img src="{{url_base}}/img/right.svg" onclick="add_url(true)" />
+</div>
+<div class="search_checkboxes">
+    <input type="checkbox" id="full" name="full" value="full" style="border-radius: 1rem;">
+    <label for="full">full <span style="font-size: 0.6rem; color: #aaa;">(don't stop even when exsisting posts encoutered)</span></label>
+    <br>
+    <input type="checkbox" id="media_only" name="media_only" value="media_only">
+    <label for="media_only">media only</label>
+</div>
+
+<div class="msg" id="msg">
+</div>
+<div class="current" id="current">
+</div>
+<div class="queue" id="queue">
+</div>
+
+<script>
+    function add_url(add_flag) {
+        var url = "";
+        if (add_flag) url = document.getElementById('url_input').value;
+        full = document.getElementById('full').checked;
+        media_only = document.getElementById('media_only').checked;
+        var jsonData = {
+            'url': url,
+            'full': full,
+            'media_only': media_only
+        }
+        fetch('{{url_base}}/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(jsonData),
+        }).then(response => response.json())
+            .then(data => {
+                if (add_flag) document.getElementById('url_input').value = '';
+                document.getElementById('msg').innerHTML = data['msg'];
+                if(data['current'])
+                    document.getElementById('current').innerHTML = data['current'];
+                else
+                    document.getElementById('current').innerHTML = 'Idle';
+                // alert(data['msg']);
+                // clear the queue
+                document.getElementById('queue').innerHTML = '';
+                data['queue'].forEach(function (item, index) {
+                    document.getElementById('queue').innerHTML += '<div class=\'job\'>' + item[0] + '</div>';
+                });
+            })
+    }
+
+    default_input = "{{default_input}}"
+    if (default_input != "") {
+        document.getElementById("url_input").value = default_input
+        setTimeout(() => { add_url(true) }, 500)
+    }
+    else {
+        setTimeout(() => { add_url(false) }, 500)
+    }
+    setInterval(() => {
+        add_url(false)
+    }, 5000);
+</script>

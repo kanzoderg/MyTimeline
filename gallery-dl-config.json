@@ -1,0 +1,66 @@
+{
+    "extractor": {
+        "base-directory": ".",
+        "path-restrict": {
+            "\\": "-",
+            "/": "-",
+            "|": "-",
+            ":": "-",
+            "*": "-",
+            "?": "-",
+            "\"": "-",
+            "<": "-",
+            ">": "-"
+        },
+        "twitter": {
+            "text-tweets": true,
+            "replies": true,
+            "postprocessors": [
+                {
+                    "name": "metadata",
+                    "event": "post",
+                    "filename": "{tweet_id}.json"
+                }
+            ]
+        },
+        "bluesky": {
+            "include": [
+                "posts"
+            ],
+            "metadata": "user",
+            "postprocessors": [
+                {
+                    "name": "metadata",
+                    "event": "post",
+                    "filename": "{createdAt[:19]}_{post_id}.json"
+                }
+            ]
+        },
+        "reddit": {
+            "whitelist": [
+                "imgur",
+                "redgifs"
+            ],
+            "parent-metadata": "_reddit",
+            "filename": "{id}_{num}.{extension}",
+            "postprocessors": [
+                {
+                    "name": "metadata",
+                    "event": "post",
+                    "filename": "{id}.json"
+                }
+            ]
+        },
+        "reddit>redgifs": {
+            "filename": "{_reddit[id]}_{id}_{num}.{extension}"
+        },
+        "reddit>imgur": {
+            "filename": "{_reddit[id]}_{id}_{num}.{extension}"
+        }
+    },
+    "downloader": {
+        "part-directory": "./tmp/.download/",
+        "retries": 20,
+        "timeout": 999
+    }
+}

@@ -1,0 +1,33 @@
+<div class="users">
+    {% for user in users %}
+    <a class="user_card" href="{{url_base}}/user/{{user.type}}/{{user.user_name}}">
+        <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_banner"></img>
+        <div class="user_card_header">
+            <img class="user_card_header_img" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
+            <div class="user_card_header_txt">
+                {% if user.type in ['x', 'bsky'] %}
+                <div class="user_card_header_title">{{user.nick}}</div>
+                <div class="user_card_header_date">@{{user.user_name}}</div>
+                {% elif user.type == 'reddit' %}
+                <div class="user_card_header_title">r/{{user.user_name}}</div>
+                {% elif user.type == 'fa' %}
+                <div class="user_card_header_title">{{user.nick}}</div>
+                <div class="user_card_header_date">~ {{user.user_name}}</div>
+                {% endif %}
+                
+            </div>
+        </div>
+        <div class="user_card_body_text">
+            {{user.description}}
+        </div>
+        <div class="user_card_update_time">
+            Updated: {{user.get_update_time_str()}}
+        </div>
+        {% if user.flagged %}
+        <div class="flagged">
+            <img src="{{url_base}}/img/flagged.svg" />
+        </div>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>

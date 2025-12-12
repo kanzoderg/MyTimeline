@@ -1,0 +1,437 @@
+<html>
+
+<head>
+    <title>Shorts</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{url_base}}/css/shorts.css" />
+</head>
+
+<body>
+    <video id="video_preload" style="display: none;"></video>
+    <img id="avatar_preload" style="display: none;"/>
+
+    <div class="container">
+        <img id="container_bg" style="display: none;"></img>
+        <div class="video_container">
+            <video id="video" loop onerror="this.src='{{url_base}}/img/error.webm';this.play();" >
+                <source src="" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <img id="next_preview" src="">
+        <div class="ui">
+            <div class="ui_bg"></div>
+            <a id="user_link" onclick="video.pause()">
+                <img id="avatar" />
+                <div class="author_info">
+                    <div id="author"></div>
+                    <div id="author_id"></div>
+                    <br>
+                    <div id="time"></div>
+                </div>
+            </a>
+            <div id="description"></div>
+            <div class="side_buttons">
+                <a class="side_button" style="bottom: 22rem;" onclick="next_with_transition()">
+                    <div class="svg_wrap">
+                        <img src="{{url_base}}/img/down.svg" />
+                    </div>
+                </a>
+                <a class="side_button og_link" style="bottom: 18rem;" target="_blank" onclick="video.pause()">
+                    <div class="svg_wrap">
+                        <img src="{{url_base}}/img/like.svg" />
+                    </div>
+                    <div class="cnt" id="like_cnt">0</div>
+                </a>
+
+                <a class="side_button og_link" style="bottom: 13rem;" target="_blank" onclick="video.pause()">
+                    <div class="svg_wrap">
+                        <img src="{{url_base}}/img/comment.svg" />
+                    </div>
+                    <div class="cnt" id="comment_cnt">0</div>
+                </a>
+
+                <a class="side_button og_link" style="bottom: 8rem;" target="_blank" onclick="video.pause()">
+                    <div class="svg_wrap">
+                        <img src="{{url_base}}/img/repost.svg" />
+                    </div>
+                    <div class="cnt" id="repost_cnt">0</div>
+                </a>
+
+                <a class="side_button" style="bottom: 3rem;" id="fav_btn">
+                    <div class="svg_wrap">
+                        <img id="fav_img" src="{{url_base}}/img/bookmark_empty.svg" />
+                    </div>
+                </a>
+            </div>
+            <a class="side_button" style="top: 1rem; left: 1rem;" onclick="history.back()">
+                <div class="svg_wrap">
+                    <img src="{{url_base}}/img/left.svg" />
+                </div>
+            </a>
+            {% if total_cnt %}
+            <a class="side_button" style="top: 1rem; left: 5rem;" onclick="go()">
+                <div class="svg_wrap">
+                    <span id="item_cnt">{{current_cnt+1}} <br><span class='total_cnt'>/{{total_cnt}}</span>
+                </div>
+            </a>
+            {% endif %}
+            <a class="side_button" style="top: 1rem; right: 1rem;" onclick="enter_fullscreen()">
+                <div class="svg_wrap">
+                    <img src="{{url_base}}/img/full.svg" style="transform: scale(0.4);" />
+                </div>
+            </a>
+
+            <div class="video_controls" id="video_controls">
+                <div class="time_label" id="time_current">00:00</div>
+                <input type="range" id="video_seek" value="0" />
+                <div class="time_label" id="time_total">00:00</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        video_preload = document.querySelector('#video_preload');
+        avatar_preload = document.querySelector('#avatar_preload');
+
+        avatar = document.querySelector('#avatar');
+        author = document.querySelector('#author');
+        author_id = document.querySelector('#author_id');
+        time_label = document.querySelector('#time');
+        description = document.querySelector('#description');
+        video_container = document.querySelector('.video_container');
+        video = document.querySelector('#video');
+        next_preview = document.querySelector('#next_preview');
+        container_bg = document.querySelector('#container_bg');
+        like_cnt = document.querySelector('#like_cnt');
+        comment_cnt = document.querySelector('#comment_cnt');
+        repost_cnt = document.querySelector('#repost_cnt');
+        fav_btn = document.querySelector('#fav_btn');
+        fav_img = document.querySelector('#fav_img');
+        user_link = document.querySelector('#user_link');
+
+        idx = {{ current_cnt }};
+
+        video_container.addEventListener('click', function () {
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        });
+        // var previousX = 0;
+        var ogY = 0;
+        var posY = 0;
+        video_container.addEventListener('touchstart', function (event) {
+            // previousX = event.touches[0].clientX;
+            ogY = event.touches[0].clientY;
+            video.style.transition = 'none';
+            next_preview.style.transition = 'none';
+            full_opacity();
+        });
+
+        video_container.addEventListener('touchmove', function (event) {
+            // posX = event.touches[0].clientX;
+            posY = event.touches[0].clientY;
+            deltaY = posY - ogY;
+            video.style.transform = 'translateY(' + deltaY + 'px)';
+            next_preview.style.transform = 'translateY(' + deltaY + 'px)';
+        });
+
+        video_container.addEventListener('touchend', function (event) {
+            // posY = event.touches[0].clientY;
+            console.log(posY, ogY);
+            if (ogY == 0 || posY == 0) {
+                return;
+            }
+            deltaY = posY - ogY;
+
+            video.style.transition = 'transform 0.3s';
+            next_preview.style.transition = 'transform 0.3s';
+
+            if (deltaY / window.innerHeight < -0.1) {
+                next_preview.style.transform = 'translateY(-100%)';
+                video.style.transform = 'translateY(-100%)';
+                next();
+            }
+            else {
+                next_preview.style.transform = 'translateY(0)';
+                video.style.transform = 'translateY(0)';
+            };
+
+            if (deltaY / window.innerHeight > 0.1) {
+                load_previous();
+            }
+
+            ogY = 0;
+            posY = 0;
+        });
+
+        video.addEventListener('loadedmetadata', function () {
+            update_next_preview();
+        });
+
+        var vid_history = [];
+
+        function load_next() {
+            //check if there are more than 2 videos in history
+            if (vid_history.length < 2) {
+                return;
+            }
+            video.pause();
+            // console.log(vid_history);
+            //get the second last video
+            video_data = vid_history[vid_history.length - 2];
+            container_bg.src = video_data.preview;
+            // video.style.opacity = 0;
+            video_preload.src = vid_history[vid_history.length - 1].url;
+            avatar_preload.src = vid_history[vid_history.length - 1].avatar;
+            video.src = video_data.url;
+
+            setTimeout(() => {
+                // video.style.opacity = 1;
+                avatar.src = video_data.avatar;
+                if( video_data.type == 'reddit' ){
+                    author_id.textContent = 'u/' + video_data.author_id;
+                    author.textContent = 'r/' + video_data.author;
+                }
+                else{
+                    author_id.textContent = '@' + video_data.author_id;
+                    author.textContent = video_data.author;
+                }
+                time_label.textContent = video_data.time;
+                description.innerHTML = video_data.description;
+                like_cnt.textContent = video_data.likes;
+                comment_cnt.textContent = video_data.comments;
+                repost_cnt.textContent = video_data.reposts;
+
+                fav_btn.setAttribute('onclick', 'add_fav("' + video_data.post_id + '")');
+                if (video_data.fav) {
+                    fav_img.src = "{{url_base}}/img/bookmark.svg";
+                }
+                else {
+                    fav_img.src = "{{url_base}}/img/bookmark_empty.svg";
+                }
+
+                //set href of all .og_link to video_data.post_url
+                document.querySelectorAll('.og_link').forEach((el) => {
+                    el.setAttribute('href', video_data.post_url);
+                });
+                user_link.href = video_data.user_url;
+
+                video.poster = video_data.preview;
+                video.style.transition = 'none';
+                video.style.transform = 'translateY(0)';
+                video.play();
+            }, 300);
+            idx += 1;
+            if (item_cnt) {
+                item_cnt.innerHTML = idx - 1 + " <br><span class='total_cnt'>/{{total_cnt}}</span>";
+            }
+            {% if total_cnt %}
+            if (idx > {{ total_cnt }}) {
+                idx = idx % {{ total_cnt }};
+            }
+        {% endif %}
+            full_opacity();
+        }
+
+        function load_previous() {
+            if (vid_history.length < 3) {
+                return;
+            }
+            // console.log(vid_history);
+            //get the second last video
+            video_data = vid_history[vid_history.length - 3];
+            avatar.src = video_data.avatar;
+            if( video_data.type == 'reddit' ){
+                author_id.textContent = 'u/' + video_data.author_id;
+                author.textContent = 'r/' + video_data.author;
+            }
+            else{
+                author_id.textContent = '@' + video_data.author_id;
+                author.textContent = video_data.author;
+            }
+            time_label.textContent = video_data.time;
+            description.innerHTML = video_data.description;
+            like_cnt.textContent = video_data.likes;
+            comment_cnt.textContent = video_data.comments;
+            repost_cnt.textContent = video_data.reposts;
+
+            fav_btn.setAttribute('onclick', 'add_fav("' + video_data.post_id + '")');
+            if (video_data.fav) {
+                fav_img.src = "{{url_base}}/img/bookmark.svg";
+            }
+            else {
+                fav_img.src = "{{url_base}}/img/bookmark_empty.svg";
+            }
+            document.querySelectorAll('.og_link').forEach((el) => {
+                el.setAttribute('href', video_data.post_url);
+            });
+            user_link.href = video_data.user_url;
+
+            video.poster = video_data.preview;
+            video.src = video_data.url;
+            vid_history.pop();
+            video.play();
+            update_next_preview();
+
+            idx -= 1;
+            if (item_cnt) {
+                item_cnt.textContent = idx - 1 + '/' + '{{total_cnt}}';
+            }
+            full_opacity();
+        }
+
+        function update_next_preview() {
+            // video_preload.src = vid_history[vid_history.length - 1].url;
+            setTimeout(() => {
+                next_preview.style.transition = 'none';
+                next_preview.style.transform = 'translateY(0)';
+                next_preview.src = vid_history[vid_history.length - 1].preview;
+            }, 300);
+        }
+
+        function next() {
+            fetch('{{url_base}}/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        return;
+                    }
+                    vid_history.push(data);
+                    if (vid_history.length > 20) {
+                        vid_history.shift();
+                    }
+                    load_next();
+                })
+        }
+
+        function next_with_transition() {
+            next_preview.style.transition = 'transform 0.3s';
+            video.style.transition = 'transform 0.3s';
+            next_preview.style.transform = 'translateY(-100%)';
+            video.style.transform = 'translateY(-100%)';
+            next();
+        }
+
+        function add_fav(post_id) {
+            fetch('{{url_base}}/add_fav?post_id=' + post_id, {
+                method: 'GET'
+            }).then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    if (data['result'] == 'added') {
+                        fav_img.src = "{{url_base}}/img/bookmark.svg";
+                    }
+                    else {
+                        fav_img.src = "{{url_base}}/img/bookmark_empty.svg";
+                    }
+                    vid_history[vid_history.length - 2].fav = data['result'] == 'added';
+                })
+        }
+
+        var wheel_debounce = false;
+        video_container.addEventListener('wheel', function (event) {
+            if (wheel_debounce) {
+                return;
+            }
+            wheel_debounce = true;
+            setTimeout(() => {
+                wheel_debounce = false;
+            }, 500);
+            if (event.deltaY < 0) {
+                load_previous();
+            }
+            if (event.deltaY > 0) {
+                next_with_transition();
+            }
+        });
+
+        // capture up, down, page up, page down keys, and spacebar to pause/play video
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowUp' || event.key === 'PageUp') {
+                load_previous();
+            }
+            if (event.key === 'ArrowDown' || event.key === 'PageDown') {
+                next_with_transition();
+            }
+            if (event.key === ' ') {
+                event.preventDefault(); // Prevent scrolling
+                if (video.paused) {
+                    video.play();
+                } else {
+                    video.pause();
+                }
+            }
+            if (event.key === 'ArrowLeft') {
+                video.currentTime = Math.max(0, video.currentTime - 2);
+            }
+            if (event.key === 'ArrowRight') {
+                video.currentTime = Math.min(video.duration, video.currentTime + 2);
+            }
+        });
+
+        video_seek = document.getElementById('video_seek'); //input
+        time_current = document.getElementById('time_current'); //current time MM:SS
+        time_total = document.getElementById('time_total'); //total time, MM:SS
+        video.addEventListener('loadedmetadata', function () {
+            video_seek.max = video.duration;
+            time_total.innerHTML = new Date(video.duration * 1000).toISOString().substr(14, 5);
+        });
+        video.addEventListener('timeupdate', function () {
+            video_seek.value = video.currentTime;
+            time_current.innerHTML = new Date(video.currentTime * 1000).toISOString().substr(14, 5);
+        });
+        video_seek.addEventListener('input', function () {
+            video.currentTime = video_seek.value;
+        });
+        function init_video() {
+            vid_history = []
+            fetch('{{url_base}}/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        history.back();
+                        return;
+                    }
+                    vid_history.push(data);
+                    idx += 1;
+                    next();
+                })
+        }
+
+        function go() {
+            num = prompt("Page number", "");
+            if (num != null) {
+                idx = parseInt(num) - 1;
+                init_video()
+            }
+        }
+        var full_opacity_timer = null;
+        function full_opacity() {
+            const ui = document.querySelector('.ui');
+            ui.style.opacity = 1;
+            clearTimeout(full_opacity_timer);
+            full_opacity_timer = setTimeout(() => {
+                ui.style.opacity = 0.3;
+            }, 4000);
+        }
+
+        function enter_fullscreen() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+            else{
+                document.documentElement.requestFullscreen();
+            }
+        }
+
+        item_cnt = document.querySelector('#item_cnt');
+
+        init_video();
+        full_opacity();
+    </script>
+</body>
+
+</html>

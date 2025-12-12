@@ -1,0 +1,53 @@
+<div class="user_header_full">
+    <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_header_banner" />
+    <div class="user_header">
+        <img class="user_header_img" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
+        <div class="user_header_txt">
+            {% if user.type in ['x', 'bsky'] %}
+            <div class="user_header_title">{{user.nick}}</div>
+            <div class="user_header_date">@{{user.user_name}}</div>
+            {% elif user.type == 'reddit' %}
+            <div class="user_header_title">r/{{user.user_name}}</div>
+            {% elif user.type == 'fa' %}
+            <div class="user_header_title">{{user.nick}}</div>
+            <div class="user_header_date">~ {{user.user_name}}</div>
+            {% endif %}
+        </div>
+        <div style="margin: 0.5rem; font-size: 0.9rem; margin-left: 0.9rem;">{{posts_cnt}} <span style="opacity: 0.6;">Posts</span></div>
+        <div class="user_body_text">
+            {{user.description | safe}}
+        </div>
+        <a class="user_header_button" href="{{url_base}}/download?url={{user.url}}" style="right: 3.5rem;">
+            <img src="{{url_base}}/img/reload.svg" />
+        </a>
+        {% if user.type == 'x' %}
+        <a class="user_header_button" href="{{user.url}}" target="_blank">
+            <img src="{{url_base}}/img/x.svg" />
+        </a>
+        {% elif user.type == 'bsky' %}
+        <a class="user_header_button" href="{{user.url}}" target="_blank">
+            <img src="{{url_base}}/img/bsky.svg" />
+        </a>
+        {% elif user.type == 'reddit' %}
+        <a class="user_header_button" href="https://www.reddit.com/r/{{user.user_name}}" target="_blank">
+            <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);"/>
+        </a>
+        {% elif user.type == 'fa' %}
+        <a class="user_header_button" href="https://www.furaffinity.net/user/{{user.user_name}}" target="_blank">
+            <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);"/>
+        </a>
+        {% endif %}
+        <div class="user_header_update_time">
+            Updated: {{user.get_update_time_str()}}
+        </div>
+        
+        {% if user.flagged %}
+        <div class="flagged" style="top: 0.85rem; right: 14.9rem; bottom: auto; left: auto; transform: scale(0.8);">
+            <img src="{{url_base}}/img/flagged.svg" />
+        </div>
+        {% endif %}
+    </div>
+    <a class="user_header_button" onclick="window.history.back(); return false;" id="back_btn">
+        <img src="{{url_base}}/img/left.svg" />
+    </a>
+</div>

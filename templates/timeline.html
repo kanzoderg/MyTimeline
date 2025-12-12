@@ -1,0 +1,205 @@
+{% if show_sort_type %}
+<div class="media_toggle" id="sort_type">
+    <a class="toggle {%if sort_type=='new'%}toggle_selected{%endif%}" href="{{page_url}}?sort=new">New</a>
+    <a class="toggle {%if sort_type=='top'%}toggle_selected{%endif%}" href="{{page_url}}?sort=top">Top</a>
+    <a class="toggle {%if sort_type=='random'%}toggle_selected{%endif%}" href="{{page_url}}?sort=random">Random</a>
+</div>
+{% endif %}
+
+{% if show_media_toggle %}
+<div class="media_toggle">
+    <a class="toggle toggle_selected" href="{{page_url}}">Posts</a>
+    <a class="toggle" href="{{page_url}}?tab=media">Media</a>
+</div>
+{% endif %}
+
+{% if sorted_posts_id | length == 0 and user_name %}
+<div class="notice_card">
+    No posts found.<br> Either the scan didn't complete or the user doesn't exist in database.<br> Try use the <img src="{{url_base}}/img/reload.svg" style="height: 1rem; vertical-align: middle; background-color: #333; border-radius: 1rem; border: 2px solid #ffffff33;" /> download button above, this will re-fetch the user data and trigger a new scan.
+</div>
+{% elif sorted_posts_id | length == 0 %}
+<div class="notice_card">
+    No posts found.
+</div>
+{% endif %}
+
+{% for post_id in sorted_posts_id %}
+<div class="card" id="p{{post_id}}">
+    <div class="card_header">
+        <a href="{{url_base}}/user/{{posts[post_id].type}}/{{posts[post_id].user_name}}">
+            <img class="card_header_img"
+                src="{{url_base}}/avatar/{{posts[post_id].type}}/{{posts[post_id].user_name}}" />
+            <div class="header_txt">
+                {% if posts[post_id].type in ['x', 'bsky'] %}
+                <div class="card_header_title">{{users[posts[post_id].user_name].nick[:20]}}
+                    <span class="card_header_name">@{{posts[post_id].user_name}}</span>
+                </div>
+                {% elif posts[post_id].type == 'reddit' %}
+                <div class="card_header_title">r/{{posts[post_id].user_name}}
+                    <span class="card_header_name">u/{{posts[post_id].real_user}}</span>
+                </div>
+                {% elif posts[post_id].type == 'fa' %}
+                <div class="card_header_title">{{users[posts[post_id].user_name].nick[:20]}}
+                    <span class="card_header_name">~ {{posts[post_id].user_name}}</span>
+                </div>
+                {% endif %}
+                <div class="card_header_date">{{posts[post_id].time}}</div>
+            </div>
+        </a>
+    </div>
+    <div class="card_body">
+        {% if posts[post_id].isreply %}
+        <a href="{{posts[post_id].url}}" target="_blank">
+            <img class="reply_icon" src="{{url_base}}/img/reply.svg" />
+        </a>
+        {% endif %}
+        <div class="card_body_text">
+            {{posts[post_id].text_content | safe}}
+        </div>
+        {% for media in media_entries[post_id] %}
+        {% if media.isvideo %}
+        <div style="position: relative;">
+            <a
+                onclick="show_float_card(event,'{{url_base}}/card/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}')">
+                <img class="card_media"
+                    src="{{url_base}}/thumb/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}"
+                    loading="lazy" style="object-fit: contain;background-color: black;" />
+                <div class="video_icon">
+                    <img src="{{url_base}}/img/play.svg" />
+                </div>
+            </a>
+        </div>
+        {% elif media.isaudio %}
+        <div style="position: relative; margin-left: 1rem;">
+            <audio controls>
+                <source
+                    src="{{url_base}}/file/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}">
+                Your browser does not support the audio element.
+            </audio>
+        </div>
+        {% elif media.isimage %}
+        <a
+            onclick="show_float_card(event,'{{url_base}}/card/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}')">
+            <img class="card_media"
+                src="{{url_base}}/file/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}"
+                loading="lazy" />
+        </a>
+        {% elif media.isflash %}
+        <div style="position: relative;">
+            <a href="{{url_base}}/ruffle/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}">
+                    <img class="card_media"
+                        src="{{url_base}}/thumb/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}"
+                        loading="lazy" style="object-fit: contain;background-color: black;" />
+                    <div class="video_icon" style="background: none;">
+                        <img src="{{url_base}}/img/flash.svg" />
+                    </div>
+            </a>
+        </div>
+        {% else %}
+        <!-- assumed attachment -->
+        <a href="{{url_base}}/file/{{posts[post_id].type}}/{{posts[post_id].user_name}}/{{media.file_name}}">
+            <div class="attachment_card">
+                <img class="attachment_icon" src="{{url_base}}/img/attachment.svg" />
+                <div class="attachment_txt">
+                    <div class="attachment_name">{{media.file_name}}</div>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% if posts[post_id].embed %}
+    <div class="card_embed">
+        {% if posts[post_id].embed_obj.external %}
+        <a class="card_embed_url" href="{{posts[post_id].embed_url}}" target="_blank">
+            <img class="card_embed_img"
+                src="{{url_base}}/img/external.svg" />
+        </a>
+        {% else %}
+        <div class="card_header">
+            <a href="{{url_base}}/user/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}">
+                <img class="card_header_img"
+                    src="{{url_base}}/avatar/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}" />
+                <div class="header_txt">
+                    <div class="card_header_title">{{posts[post_id].embed_obj.nick[:20]}}
+                        <span class="card_header_name">@{{posts[post_id].embed_obj.user_name}}</span>
+                    </div>
+                    <div class="card_header_date">{{posts[post_id].embed_obj.time}}</div>
+                </div>
+            </a>
+        </div>
+        <div class="card_embed_text card_body_text">
+            {{posts[post_id].embed_obj.text_content | safe}}
+        </div>
+        {% for media in posts[post_id].embed_obj.medias %}
+        {% if media.isvideo %}
+        <div style="position: relative;">
+            <a
+                onclick="show_float_card(event,'{{url_base}}/card/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}/{{media.file_name}}')">
+                <img class="card_media"
+                    src="{{url_base}}/thumb/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}/{{media.file_name}}"
+                    loading="lazy" style="object-fit: contain;background-color: black;" />
+                <div class="video_icon">
+                    <img src="{{url_base}}/img/play.svg" />
+                </div>
+            </a>
+        </div>
+        {% elif media.isaudio %}
+        <div style="position: relative;">
+            <audio controls>
+                <source
+                    src="{{url_base}}/file/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}/{{media.file_name}}">
+                Your browser does not support the audio element.
+            </audio>
+        </div>
+        {% elif media.isimage %}
+        <a
+            onclick="show_float_card(event,'{{url_base}}/card/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}/{{media.file_name}}')">
+            <img class="card_media"
+                src="{{url_base}}/file/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}/{{media.file_name}}"
+                loading="lazy" />
+        </a>
+        {% else %}
+        <!-- assumed attachment -->
+        <a href="{{url_base}}/file/{{posts[post_id].type}}/{{posts[post_id].embed_obj.user_name}}/{{media.file_name}}">
+            <div class="attachment_card">
+                <img class="attachment_icon" src="{{url_base}}/img/attachment.svg" />
+                <div class="attachment_txt">
+                    <div class="attachment_name">{{media.file_name}}</div>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+        {% endfor %}
+        <a href="{{posts[post_id].embed_obj.url}}" class="card_link" target="_blank" style="position: absolute;">
+            <img src="{{url_base}}/img/link.svg" />
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+    <div class="card_footer">
+        <a class="card_footer_item" href="{{posts[post_id].url}}" target="_blank">
+            <img src="{{url_base}}/img/like.svg" />
+            <span>{{posts[post_id].likes}}</span>
+        </a>
+        <a class="card_footer_item" href="{{posts[post_id].url}}" target="_blank">
+            <img src="{{url_base}}/img/comment.svg" />
+            <span>{{posts[post_id].comments}}</span>
+        </a>
+        <a class="card_footer_item" href="{{posts[post_id].url}}" target="_blank">
+            <img src="{{url_base}}/img/repost.svg" />
+            <span>{{posts[post_id].reposts}}</span>
+        </a>
+        <a class="card_footer_item" onclick="add_fav('{{post_id}}')">
+            {% if posts[post_id].fav %}
+            <img src="{{url_base}}/img/bookmark.svg" class="p{{post_id}}_fav" />
+            {% else %}
+            <img src="{{url_base}}/img/bookmark_empty.svg" class="p{{post_id}}_fav" />
+            {% endif %}
+        </a>
+    </div>
+    <a href="{{posts[post_id].url}}" class="card_link" target="_blank">
+        <img src="{{url_base}}/img/link.svg" />
+    </a>
+</div>
+{% endfor %}

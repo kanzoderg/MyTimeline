@@ -1,0 +1,266 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+input:focus {
+    outline-width: 0;
+}
+
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: none;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ffffff22;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #ffffffcc;
+}
+
+html,
+body {
+    overscroll-behavior: none;
+    color: #f0f0f0;
+}
+
+body {
+    background-color: #000;
+    font-family: Arial, sans-serif;
+    height: 100%;
+    width: 100%;
+    --accent-color-light: rgb(43, 188, 255);
+}
+
+.container {
+    position: fixed;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    /* background-color: #000000; */
+}
+
+.hyperlink {
+    color: var(--accent-color-light);
+}
+
+.video_container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #00000000;
+}
+
+#video {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s;
+}
+
+#next_preview {
+    position: fixed;
+    top: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s;
+}
+
+#description {
+    position: fixed;
+    font-size: 0.9rem;
+    bottom: 3.5rem;
+    left: 1rem;
+    height: 3rem;
+    max-width: calc(100% - 10rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#avatar {
+    position: fixed;
+    bottom: 7rem;
+    left: 1rem;
+    height: 2rem;
+    width: 2rem;
+    border-radius: 50%;
+    border: solid 0.1rem #eee;
+    background-color: #333;
+}
+
+.author_info {
+    position: fixed;
+    left: 3.6rem;
+    bottom: 6.8rem;
+    line-height: 1.1rem;
+    width: auto;
+    max-width: calc(100% - 7rem);
+    text-wrap: nowrap;
+    overflow: hidden;
+    /* background-color: aqua; */
+}
+
+.author_info div{
+    display: inline-block;
+}
+
+#author{
+    font-size: 0.9rem;
+}
+
+#author_id, #time {
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+.ui_bg {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(0deg, #00000099 0%, #00000000 40%);
+}
+
+.ui {
+    transition: opacity 0.3s;
+}
+
+#container_bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: blur(30px);
+    opacity: 0.2;
+    transition: all 0.3s;
+    /* z-index: -1; */
+}
+
+.side_button {
+    position: fixed;
+    right: 0.75rem;
+    height: 4.2rem;
+    width: 3rem;
+}
+
+.svg_wrap {
+    user-select: none;
+    height: 3rem;
+    width: 3rem;
+    border-radius: 50%;
+    background-color: #00000066;
+    text-align: center;
+    vertical-align: middle;
+    color: #ffffff99;
+    font-size: 0.8rem;
+    transition: background-color 0.3s;
+}
+
+.svg_wrap:hover {
+    background-color: #66666666;
+}
+
+.side_button img {
+    height: 3rem;
+    width: 3rem;
+    transform: scale(0.5);
+}
+
+.cnt {
+    height: 1rem;
+    margin-top: 0.1rem;
+    width: 3rem;
+    text-align: center;
+    font-size: 0.8rem;
+    text-shadow: #000 0 0 0.4rem;
+}
+
+#video_controls {
+    position: fixed;
+    bottom: 1rem;
+    left: 0;
+    width: 100%;
+    height: 2rem;
+    display: flex;
+    justify-content: space-between;
+    text-wrap: nowrap;
+    align-items: center;
+    text-align: center;
+    opacity: 0.8;
+}
+
+#time_current,
+#time_total {
+    display: inline-block;
+    font-size: 0.8rem;
+    color: #ffffffaa;
+    margin: 0 0.5rem;
+    width: 3rem;
+}
+
+#video_seek {
+    display: inline-block;
+    width: calc(100% - 6rem);
+    /* margin-top: 1rem; */
+    height: 0.5rem;
+    background-color: #ffffff66;
+    border-radius: 0.25rem;
+    appearance: none;
+    outline: none;
+    transition: all 0.3s;
+    border-radius: 1rem;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#video_seek::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: #ff1111;
+    border: none;
+    height: 0.7rem;
+    width: 0.7rem;
+    border-radius: 0.5rem;
+}
+
+#video_seek::-webkit-slider-runnable-track {
+    -webkit-appearance: none;
+    appearance: none;
+
+    /* height: 0.2rem; */
+    /* background-color: #ffffff55; */
+}
+
+#item_cnt {
+    display: inline-block;
+    font-size: 0.9rem;
+    color: #fff;
+    margin-top: 0.7rem;
+    line-height: 0.8rem;
+}
+
+.total_cnt {
+    font-size: 0.7rem;
+    opacity: 0.8;
+}

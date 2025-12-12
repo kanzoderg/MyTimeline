@@ -1,0 +1,87 @@
+.users {
+    text-align: center;
+}
+
+.user_card {
+    position: relative;
+    display: inline-block;
+    text-align: left;
+    background-color: #00000099;
+    color: #fff;
+    text-decoration: none;
+    width: 17rem;
+    border-radius: 1rem;
+    margin: 0.5rem;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.user_card:hover {
+    background-color: #00000066;
+}
+
+.user_banner {
+    position: absolute;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    object-fit: cover;
+}
+
+.user_card_header_txt {
+    display: inline-block;
+    width: calc(100% - 7rem);
+    height: 3rem;
+    /* background-color: yellow; */
+    vertical-align: top;
+    margin-top: 1rem;
+}
+
+.user_card_header_img {
+    display: inline-block;
+    width: 3rem;
+    height: 3rem;
+    background-color: #666;
+    border-radius: 50%;
+    margin: 1rem 0.3rem 1rem 1rem;
+    margin-bottom: 0;
+}
+
+.user_card_header_title {
+    line-height: 1.8rem;
+    text-wrap: nowrap;
+}
+
+.user_card_header_date {
+    line-height: 1.2rem;
+    font-size: smaller;
+    color: #aaa;
+    text-wrap: nowrap;
+}
+
+.user_card_body_text {
+    margin: 1rem;
+    height: 6rem;
+    overflow: hidden;
+    font-size: 0.9rem;
+}
+
+.user_card_update_time {
+    font-size: 0.75rem;
+    /* font-weight: bold; */
+    color: #ffffffaa;
+    text-wrap: nowrap;
+    margin-left: 1rem;
+    margin-bottom: 0.4rem;
+    text-shadow: 0rem 0rem 0.1rem #00000099;
+}
+
+.user_card_media {
+    display: inline-block;
+    width: 100%;
+    height: auto;
+    background-color: blue;
+    overflow: hidden;
+}

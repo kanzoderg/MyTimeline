@@ -1,0 +1,117 @@
+<div id="media_viewer" class="media_viewer">
+    <style>
+        .media {
+            position: fixed;
+            display: none;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .bck_btn {
+            user-select: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 10rem;
+            z-index: 2;
+            background-color: #000000bb;
+            color: #fff;
+            opacity: 0;
+        }
+
+        .back_img {
+            opacity: 0.07;
+            height: 10rem;
+            width: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            transform: scale(1.5);
+        }
+
+        .bck_btn:hover {
+            opacity: 1;
+        }
+    </style>
+    <video controls loop autoplay src="" id="video" class="media"></video>
+    <img src="" id="image" class="media"></img>
+    <div class="bck_btn" id="bck" onclick="close_media_viewer()">
+        <img src="{{url_base}}/img/left.svg" class="back_img"></img>
+    </div>
+    <script src="{{url_base}}/js/panzoom.js"></script>
+    <script>
+        const media_viewer = document.getElementById('media_viewer');
+        const video = document.getElementById('video')
+        const image = document.getElementById('image')
+        const bck_btn = document.getElementById('bck')
+        bck_btn.addEventListener('contextmenu', event => event.preventDefault());
+
+        var zoom = null;
+        var selected = null;
+
+        function is_fullscreen() {
+            return document.fullscreenElement != null;
+        }
+
+        function show_media_viewer(src, isvideo) {
+            loading_viewer = true;
+            if (isvideo) {
+                selected = video;
+            } else {
+                selected = image;
+            }
+            selected.src = src;
+            if(isvideo)
+            {
+                selected.poster = src.replace("file/","thumb/")
+            }
+            selected.style.display = 'block';
+            media_viewer.style.display = 'block';
+            zoom = Panzoom(selected, {
+                animate: false, maxScale: 8, minScale: 0.05,
+                setTransform: (elem, { scale, x, y }) => {
+                    zoom.setStyle('transform', `scale(${scale}) translate(${x}px, ${y}px) rotate(0deg)`)
+                    zoom.setStyle('transition', 'none')
+                }
+            })
+            selected.addEventListener('wheel', zoom.zoomWithWheel)
+            media_viewer.requestFullscreen()
+            setTimeout(() => {
+                loading_viewer = false;
+            }, 600);
+        }
+
+        function close_media_viewer() {
+            video.src = ""
+            image.src = ""
+            video.style.display = 'none';
+            image.style.display = 'none';
+            media_viewer.style.display = 'none';
+            selected.removeEventListener('wheel', zoom.zoomWithWheel)
+            document.exitFullscreen()
+        }
+
+        var loading_viewer = false;
+
+        setInterval(() => {
+            if (loading_viewer) {
+                return;
+            }
+            if (!is_fullscreen()) {
+                if (selected && selected.src) {
+                    video.src = ""
+                    image.src = ""
+                    video.style.display = 'none';
+                    image.style.display = 'none';
+                    media_viewer.style.display = 'none';
+                    selected.removeEventListener('wheel', zoom.zoomWithWheel)
+                }
+            }
+        }, 200);
+
+    </script>
+</div>

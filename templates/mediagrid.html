@@ -1,0 +1,34 @@
+
+<div class="media_toggle">
+    <a class="toggle" href="{{page_url}}">Posts</a>
+    <a class="toggle toggle_selected" href="{{page_url}}?tab=media">Media</a>
+</div>
+<div class="media_grid">
+    {% for media_id in sorted_media_id %}
+    {% if media_entries[media_id].isvideo or media_entries[media_id].isimage %}
+    <div class="media_grid_item" onclick="show_float_card(event,'{{url_base}}/card/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}')">
+        <img src="{{url_base}}/thumb/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}"
+        loading="lazy" />
+        {% if media_entries[media_id].isvideo %}
+        <div class="video_icon">
+            <img src="{{url_base}}/img/play.svg"/>
+        </div>
+        {% endif %}
+    </div>
+    {% elif media_entries[media_id].isflash %}
+    <a class="media_grid_item" href='{{url_base}}/ruffle/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}'>
+        <img src="{{url_base}}/thumb/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}"
+        loading="lazy" />
+        <div class="video_icon" style="background: none;">
+            <img src="{{url_base}}/img/flash.svg"/>
+        </div>
+    </a>
+    {% elif media_entries[media_id].isaudio %}
+    <div class="media_grid_item" onclick="show_float_card(event,'{{url_base}}/card/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}')" style="background-color: #000;">
+        <div class="video_icon" style="background: none;">
+            <img src="{{url_base}}/img/audio.svg"/>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>

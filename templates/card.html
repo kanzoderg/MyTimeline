@@ -1,0 +1,82 @@
+{% if media.isvideo %}
+<video class="card_media" id="float_card_media" loop autoplay onload="init_video_controls()" style="margin: 0;" >
+    <source src="{{url_base}}/file/{{post.type}}/{{post.user_name}}/{{media.file_name}}" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+{% elif media.isaudio %}
+<video class="card_media" id="float_card_media" loop autoplay onload="init_video_controls()" style="margin: 0;transform: scale(0.5);"  poster="{{url_base}}/img/audio.svg">
+    <source src="{{url_base}}/file/{{post.type}}/{{post.user_name}}/{{media.file_name}}">
+    Your browser does not support the video tag.
+</video>
+{% else %}
+<img class="card_media" id="float_card_media"
+    src="{{url_base}}/file/{{post.type}}/{{post.user_name}}/{{media.file_name}}" style="margin: 0;" />
+{% endif %}
+<div class="card" id="p{{post_id}}" style="border-radius: 0; border: none; width: 100%; background: #00000099;">
+    {% if media.isvideo or media.isaudio %}
+    <div class="video_controls">
+        <div class="time_label" id="time_current">00:00</div>
+        <input type="range" id="video_seek" value="0" />
+        <div class="time_label" id="time_total">00:00</div>
+    </div>
+    <div id="pause_btn" onclick="toggle_video_play()" >
+        <img src="{{url_base}}/img/pause_w.svg" id="pause_btn_img"/>
+    </div>
+    {% endif %}
+    <div class="card_header">
+        <a href="{{url_base}}/user/{{post.type}}/{{post.user_name}}">
+            <img class="card_header_img" src="{{url_base}}/avatar/{{post.type}}/{{post.user_name}}" />
+        </a>
+        <div class="header_txt">
+            {% if post.type in ['x', 'bsky'] %}
+            <div class="card_header_title">{{user.nick[:20]}}
+                <span class="card_header_name">@{{user.user_name}}</span>
+            </div>
+            {% elif post.type == 'reddit' %}
+            <div class="card_header_title">r/{{user.user_name}}
+                <span class="card_header_name">u/{{post.real_user}}</span>
+            </div>
+            {% elif post.type == 'fa' %}
+            <div class="card_header_title">{{user.nick[:20]}}
+                <span class="card_header_name">~ {{user.user_name}}</span>
+            </div>
+            {% endif %}
+            <div class="card_header_date">{{post.time}}</div>
+        </div>
+    </div>
+    <div class="card_body">
+        <div class="card_body_text" style="height: 4rem; overflow-y: auto;">
+            {{post.text_content | safe}}
+        </div>
+    </div>
+    <div class="card_footer">
+        <a class="card_footer_item" href="{{post.url}}" target="_blank">
+            <img src="{{url_base}}/img/like.svg" />
+            <span>{{post.likes}}</span>
+        </a>
+        <a class="card_footer_item" href="{{post.url}}" target="_blank">
+            <img src="{{url_base}}/img/comment.svg" />
+            <span>{{post.comments}}</span>
+        </a>
+        <a class="card_footer_item" href="{{post.url}}" target="_blank">
+            <img src="{{url_base}}/img/repost.svg" />
+            <span>{{post.reposts}}</span>
+        </a>
+        <a class="card_footer_item" onclick="add_fav('{{post.post_id}}')">
+            {% if post.fav %}
+            <img src="{{url_base}}/img/bookmark.svg" class="p{{post.post_id}}_fav" />
+            {% else %}
+            <img src="{{url_base}}/img/bookmark_empty.svg" class="p{{post.post_id}}_fav" />
+            {% endif %}
+        </a>
+    </div>
+    <a href="{{post.url}}" class="card_link" target="_blank">
+        <img src="{{url_base}}/img/link.svg" />
+    </a>
+    <a onclick="hide_float_card()" class="card_link" style="position: fixed; top: 1.5rem; left: 1.5rem; transform: scale(1.3);">
+        <img src="{{url_base}}/img/left.svg" />
+    </a>
+    <a onclick="enter_fullscreen()" class="card_link" style="position: fixed; top: 1.5rem; right: 1.5rem; transform: scale(1.3);">
+        <img src="{{url_base}}/img/full.svg"  style="transform: scale(0.6);"/>
+    </a>
+</div>

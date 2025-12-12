@@ -1,0 +1,45 @@
+<html>
+<head>
+    <title>Busy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #000;
+            color: #fff;
+            margin-top: 50px;
+        }
+        #back_btn {
+            text-decoration: none;
+            display: inline-block;
+            height: 4rem;
+            width: 4rem;
+            background-color: #111;
+            border-radius: 4rem;
+        }
+        #back_btn:hover {
+            background-color: #222;
+        }
+
+        #back_btn img{
+            height: 4rem;
+            width: 4rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="busy-message">
+        <p>Indexing in progress...</p>
+        <p>Please wait, this may take a while.</p>
+    </div>
+    <div id="back_btn" onclick="window.location.href='{{url_base}}/userlist'">
+        <img src="{{url_base}}/img/left.svg">
+    </div>
+    <script>
+        setInterval(() => {
+            location.reload();
+        }, 5000); // Refresh every 5 seconds
+    </script>
+</body>
+</html>

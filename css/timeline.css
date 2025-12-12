@@ -1,0 +1,256 @@
+.card {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    min-height: 5rem;
+    margin-bottom: 0.5rem;
+    overflow: visible;
+    background-color: var(--bg-color);
+    /* border-radius: 0.5rem; */
+    border-bottom: 0.08rem solid #333;
+}
+
+.card_header {
+    text-wrap: nowrap;
+}
+
+.card_header a {
+    text-wrap: nowrap;
+}
+
+.card_header_img {
+    display: inline-block;
+    width: 2.5rem;
+    height: 2.5rem;
+    background-color: #666;
+    border-radius: 50%;
+    margin: 0.5rem 0.2rem 0.5rem 0.5rem;
+    margin-bottom: 0;
+}
+
+.header_txt {
+    display: inline-block;
+    height: 3rem;
+    vertical-align: top;
+    margin-top: 0.5rem;
+}
+
+.card_header_title {
+    line-height: 1.4rem;
+    font-size: 0.9rem;
+    text-wrap: nowrap;
+}
+
+.card_header_name,
+.card_header_date {
+    line-height: 1.2rem;
+    font-size: 0.8rem;
+    opacity: 0.6;
+    text-wrap: nowrap;
+}
+
+.card_body_text {
+    padding: 0.2rem 0.9rem 0.4rem 0.9rem;
+    font-size: 0.9rem;
+    line-height: 1.2rem;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.card_media {
+    display: inline-block;
+    margin: 0rem 0.5rem 0rem 0.5rem;
+    background-color: #000;
+    width: calc(100% - 1rem);
+    height: auto;
+    object-fit: contain;
+    overflow: hidden;
+    min-height: 15rem;
+    border-radius: 0.6rem;
+}
+
+.card_body .card_media {
+    -webkit-user-drag: auto;
+    object-fit: contain;
+    max-height: 60vh;
+    border: 0.05rem solid #222;
+}
+
+.card_footer {
+    user-select: none;
+    text-align: center;
+    text-wrap: nowrap;
+    text-decoration: none;
+    margin-top: 0.2rem;
+    margin-bottom: 0.3rem;
+}
+
+.card_footer_item {
+    display: inline-block;
+    width: 25%;
+    height: 1.2rem;
+    align-items: center;
+    opacity: 0.5;
+}
+
+.card_footer_item:hover {
+    opacity: 0.8;
+    cursor: pointer;
+}
+
+.card_footer_item img {
+    display: inline-block;
+    height: 1.2rem;
+}
+
+.card_footer_item span {
+    display: inline-block;
+    height: 1.2rem;
+    line-height: 1.2rem;
+    font-size: 0.7rem;
+    vertical-align: top;
+}
+
+.card_link {
+    position: absolute;
+    text-align: center;
+    right: 0.6rem;
+    top: 0.6rem;
+    height: 2rem;
+    width: 2rem;
+    background-color: var(--bg-color);
+    border-radius: 3rem;
+    opacity: 0.7;
+    border: 1px solid #ffffff33;
+}
+
+.card_link:hover {
+    background-color: #33333399;
+    opacity: 1;
+}
+
+.card_link img {
+    margin-top: 0.25rem;
+    height: 1.5rem;
+    width: 1.5rem;
+}
+
+.media_viewer {
+    position: fixed;
+    border: none;
+    display: none;
+    z-index: 9;
+    height: 100%;
+    width: 100%;
+    left: 0;
+    top: 0;
+    overflow: hidden;
+}
+
+.video_icon {
+    position: absolute;
+    left: calc(50% - 1.5rem);
+    top: calc(50% - 1.5rem);
+    height: 3rem;
+    width: 3rem;
+    background: #fff;
+    border-radius: 4rem;
+    opacity: 0.6;
+}
+
+.video_icon img {
+    height: 3rem;
+    width: 3rem;
+    transform: scale(1.5);
+}
+
+.media_toggle {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+.toggle {
+    display: inline-block;
+    border: 0.1rem solid #666;
+    color: #999;
+    height: 1.8rem;
+    line-height: 1.7rem;
+    width: 4rem;
+    border-radius: 2rem;
+    font-size: 0.8rem;
+}
+
+.toggle_selected {
+    background-color: #999;
+    border: 0.1rem solid var(--bg-light);
+    color: #000;
+}
+
+.card_embed {
+    position: relative;
+    border: 0.08rem solid #333;
+    border-radius: 0.5rem;
+    margin: 0.4rem;
+    overflow: hidden;
+}
+
+.card_embed_url {
+    display: inline-block;
+    text-align: center;
+    background-color: #000;
+    height: 3rem;
+    width: 100%;
+}
+
+.card_embed_url img {
+    display: inline-block;
+    height: 2rem;
+    width: 3rem;
+    margin-top: 0.5rem;
+    opacity: 0.5;
+}
+
+.reply_icon {
+    height: 1.3rem;
+    width: 1.3rem;
+    margin-left: 1rem;
+    margin-top: 0.3rem;
+    opacity: 0.6;
+}
+
+.rdt_title {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.attachment_card{
+    background-color: #000;
+    text-align: left;
+    margin: 1rem;
+    padding: 0.5rem 1rem 0.1rem 1rem;
+    border-radius: 1rem;
+    overflow-y: hidden;
+    overflow-x: auto;
+    border: 0.02rem solid #333;
+    white-space: nowrap;
+}
+
+.attachment_icon{
+    display: inline-block;
+    height: 2rem;
+    width: 2rem;
+    opacity: 0.6;
+}
+
+.attachment_txt{
+    display: inline-block;
+    color: #b8b8b8;
+    font-size: 0.9rem;
+    line-height: 2rem;
+    vertical-align: top;
+    margin-left: 0.5rem;
+}

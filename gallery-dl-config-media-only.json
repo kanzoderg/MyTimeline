@@ -1,0 +1,45 @@
+{
+    "extractor": {
+        "base-directory": ".",
+        "path-restrict": {
+            "\\": "-",
+            "/": "-",
+            "|": "-",
+            ":": "-",
+            "*": "-",
+            "?": "-",
+            "\"": "-",
+            "<": "-",
+            ">": "-"
+        },
+        "twitter": {
+            "text-tweets": false,
+            "replies": true,
+            "postprocessors": [
+                {
+                    "name": "metadata",
+                    "event": "post",
+                    "filename": "{tweet_id}.json"
+                }
+            ]
+        },
+        "bluesky": {
+            "include": [
+                "media"
+            ],
+            "metadata": "user",
+            "postprocessors": [
+                {
+                    "name": "metadata",
+                    "event": "post",
+                    "filename": "{createdAt[:19]}_{post_id}.json"
+                }
+            ]
+        }
+    },
+    "downloader": {
+        "part-directory": "./tmp/.download/",
+        "retries": 20,
+        "timeout": 999
+    }
+}
