@@ -190,7 +190,7 @@ class Item:
                 self.already_exists = True
                 return
             self.title = soup.find(class_="submission-title").text.strip()
-            self.image_url = soup.find(class_="button", text="Download")["href"]
+            self.image_url = soup.find(class_="button", string="Download")["href"]
             self.filename = self.image_url.split("/")[-1]
             self.timestamp = int(soup.find(class_="popup_date")["data-time"])
             self.date = time.strftime(
@@ -293,7 +293,7 @@ class Pager:
                 title = item.find("figcaption").p.text.strip()
                 id_ = link.strip("/").split("/")[-1]
                 yield Item(link, id_, self.category, self.user, artist=artist, title=title)
-            if not soup.find("button", text="Next"):
+            if not soup.find("button", string="Next"):
                 break
             self.page += 1
 
@@ -326,7 +326,7 @@ class Pager:
                     timestamp,
                     comments,
                 )
-            if not soup.find("button", text="Older"):
+            if not soup.find("button", string="Older"):
                 break
             self.page += 1
 
