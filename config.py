@@ -4,7 +4,7 @@ url_base = "mt"
 
 # get cookies.txt from your browser!
 # cookies_list = {"x": "./x.com_cookies.txt", "bsky": ""} 
-cookies_list = {"x": "./cookies.txt", "bsky": ""}
+cookies_list = {"x": "./x.com_cookies.txt", "bsky": ""}
 
 fs_bases = {
     "x": "~/twitter",
@@ -16,7 +16,7 @@ fs_bases = {
 cache_path = "~/.cache/mt"
 thubnail_size = 600
 
-custom_gallery_dl_location = "~/venv/bin/gallery-dl" #~/venv/bin/gallery-dl
+custom_gallery_dl_location = "" #~/venv/bin/gallery-dl
 
 items_per_page = 30
 proxy = None
