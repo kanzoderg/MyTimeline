@@ -20,7 +20,7 @@ args = arg_parser.parse_args()
 
 cookies = {"a": args.a, "b": args.b}
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
 }
 
 
@@ -29,13 +29,13 @@ def get(url):
     for attempt in range(retry_count):
         try:
             response = requests.get(url, cookies=cookies, headers=headers, timeout=10)
-            response.raise_for_status()  # Raise an error for bad status codes
+            response.raise_for_status()
             return response
         except requests.RequestException as e:
             print(f"Attempt {attempt + 1} failed: {e}")
-            time.sleep(2)  # Wait before retrying
+            time.sleep(2)
             if attempt == retry_count - 1:
-                raise  # Re-raise the last exception if all attempts fail
+                raise
 
 
 exsisting_items = set()
@@ -50,10 +50,13 @@ def scan_existing_items(user):
         return
     for filename in os.listdir(user_path):
         if filename.endswith(".json") and re.match(r"\d+", filename):
-            file_path = os.path.join(user_path, filename)
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                exsisting_items.add(data["id"])
+            try:
+                file_path = os.path.join(user_path, filename)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    exsisting_items.add(data["id"])
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}")
     print(f"Found {len(exsisting_items)} existing items for user {user}")
     print(exsisting_items)
 
@@ -76,6 +79,11 @@ def put_user_info(user):
     with open("debug_user.html", "w", encoding="utf-8") as f:
         f.write(resp.text)
     description = soup.find(class_="userpage-profile").decode_contents()
+    try:
+        user_profile = soup.find(class_="userpage-layout-right-col-content").decode_contents()
+    except Exception as e:
+        print(f"Failed to parse user profile for {user}: {e}")
+        user_profile = ""
     user_info = {
         "username": user,
         "display_name": display_name,
@@ -83,6 +91,7 @@ def put_user_info(user):
         "banner_url": banner_url,
         "avatar_url": avatar_url,
         "description": description,
+        "profile": user_profile,
     }
     os.makedirs(os.path.join(args.output, user), exist_ok=True)
     with open(user_info_file, "w", encoding="utf-8") as f:
@@ -127,6 +136,7 @@ class Item:
         self.tags = []
         self.views = 0
         self.comments = comments
+        self.favorites = 0
         self.rating = ""
         self.filename = f"{id_}"
         self.image_url = ""
@@ -137,7 +147,7 @@ class Item:
             scan_existing_items(user)
             if id_ in exsisting_items:
                 self.already_exists = True
-                print(f"l86: Already exists: [{ self.id_}] {self.user}")
+                print(f"l141: Already exists: [{ self.id_}] {self.user}")
 
     def parse(self):
         if not self.available:
@@ -173,20 +183,22 @@ class Item:
             if not self.user:
                 try:
                     self.user = (
-                    soup.find(class_="c-usernameBlockSimple")
-                    .a["href"]
-                    .strip("/")
-                    .split("/")[-1]
-                )
-                    self.artist = soup.find(class_="c-usernameBlockSimple").a.text.strip()
+                        soup.find(class_="c-usernameBlockSimple")
+                        .a["href"]
+                        .strip("/")
+                        .split("/")[-1]
+                    )
+                    self.artist = soup.find(
+                        class_="c-usernameBlockSimple"
+                    ).a.text.strip()
                 except Exception as e:
-                    print(f"l180 Failed to parse user for item {self.id_}: {e}")
+                    print(f"l184 Failed to parse user for item {self.id_}: {e}")
                     self.available = False
                     return
             put_user_info(self.user)
             scan_existing_items(self.user)
             if self.id_ in exsisting_items:
-                print(f"l121: Already exists: [{ self.id_}] {self.user}")
+                print(f"l190: Already exists: [{ self.id_}] {self.user}")
                 self.already_exists = True
                 return
             self.title = soup.find(class_="submission-title").text.strip()
@@ -196,7 +208,9 @@ class Item:
             self.date = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(self.timestamp)
             )
-            self.description = soup.find(class_="submission-description").decode_contents()
+            self.description = soup.find(
+                class_="submission-description"
+            ).decode_contents()
             for tag_elem in soup.find_all(class_="tags"):
                 tag_text = tag_elem.text.strip()
                 self.tags.append(tag_text)
@@ -217,7 +231,7 @@ class Item:
             self.date = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(self.timestamp)
             )
-            self.description = soup.find(class_="journal-content").text.strip()
+            self.description = soup.find(class_="journal-content").decode_contents()
             self.views = 0
             self.comments = soup.find(class_="section-footer").span.text.strip()
             self.favorites = 0
@@ -235,31 +249,33 @@ class Item:
         file_path = os.path.join(output_path, self.filename)
         if self.category in ["gallery", "scraps"]:
             if os.path.exists(file_path):
-                print(f"l167 Already exists: [{ self.id_}] {file_path}")
+                print(f"l239 Already exists: [{ self.id_}] {file_path}")
                 self.already_exists = True
             else:
                 resp = get(self.image_url)
                 with open(file_path, "wb") as f:
                     f.write(resp.content)
         with open(file_path + ".json", "w", encoding="utf-8") as f:
+            data = {
+                "user": self.user,
+                "artist": self.artist,
+                "category": self.category,
+                "title": self.title,
+                "link": self.link,
+                "id": self.id_,
+                "timestamp": self.timestamp,
+                "date": self.date,
+                "description": self.description,
+                "tags": self.tags,
+                "views": self.views,
+                "favorites": self.favorites,
+                "comments": self.comments,
+                "rating": self.rating,
+                "url": self.image_url,
+                "filename": self.filename,
+            }
             json.dump(
-                {
-                    "user": self.user,
-                    "artist": self.artist,
-                    "category": self.category,
-                    "title": self.title,
-                    "link": self.link,
-                    "id": self.id_,
-                    "timestamp": self.timestamp,
-                    "date": self.date,
-                    "description": self.description,
-                    "tags": self.tags,
-                    "views": self.views,
-                    "comments": self.comments,
-                    "rating": self.rating,
-                    "url": self.image_url,
-                    "filename": self.filename,
-                },
+                data,
                 f,
             )
         if not self.already_exists:
@@ -292,7 +308,9 @@ class Pager:
                 link = item.find("a")["href"]
                 title = item.find("figcaption").p.text.strip()
                 id_ = link.strip("/").split("/")[-1]
-                yield Item(link, id_, self.category, self.user, artist=artist, title=title)
+                yield Item(
+                    link, id_, self.category, self.user, artist=artist, title=title
+                )
             if not soup.find("button", string="Next"):
                 break
             self.page += 1
@@ -308,7 +326,7 @@ class Pager:
                 title = item.find(class_="section-header").h2.text.strip()
                 link = item.find(class_="section-footer").a["href"]
                 id_ = link.strip("/").split("/")[-1]
-                description = item.find(class_="section-body").text.strip()
+                description = item.find(class_="section-body").decode_contents()
                 timestamp = int(item.find(class_="popup_date")["data-time"])
                 comments = (
                     item.find(class_="section-footer")
@@ -334,7 +352,9 @@ class Pager:
 def main():
     gallery_pattern = r"https://www\.furaffinity\.net/view/(\d+)"
     journal_pattern = r"https://www\.furaffinity\.net/journal/(\d+)"
-    user_content_pattern = r"https://www\.furaffinity\.net/(gallery|scraps|journals)/([\w\d_\-\.\~]+)"
+    user_content_pattern = (
+        r"https://www\.furaffinity\.net/(gallery|scraps|journals)/([\w\d_\-\.\~]+)"
+    )
     user_pattern = r"https://www\.furaffinity\.net/user/([\w\d_\-\.\~]+)"
     if re.match(gallery_pattern, args.url):
         category = "gallery"
@@ -348,9 +368,7 @@ def main():
         item = Item(args.url, id_, category)
         item.parse()
         item.fetch()
-    elif re.match(
-        user_content_pattern, args.url
-    ):
+    elif re.match(user_content_pattern, args.url):
         m = re.match(
             user_content_pattern,
             args.url,

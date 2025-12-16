@@ -57,6 +57,7 @@ def set_csp_header(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:;"
     )
+    response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
 
@@ -911,11 +912,13 @@ def cache_proxy(subpath):
     subpath.lstrip("/")
     subpath = "https://" + subpath
     filename = subpath.split("/")[-1]
-    cache_path = os.path.join(config.cache_path, filename)
+    cache_path = os.path.join("tmp/.cached", filename)
     if os.path.exists(cache_path):
-        print(f"Serving from cache: {cache_path}")
+        if args.debug:
+            print(f"Serving from cache: {cache_path}")
         return set_cache_header(send_file(cache_path))
     else:
+        os.makedirs("tmp/.cached", exist_ok=True)
         print(f"Fetching from remote: {subpath}")
         r = requests.get(subpath, headers=utils.headers)
         with open(cache_path, "wb") as f:

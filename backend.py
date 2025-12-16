@@ -819,6 +819,8 @@ def scan_for_posts(type, db, user_name=None):
                                 "Error loading:",
                                 os.path.join(fs_base, user_name, post_file),
                             )
+                            if debug_mode:
+                                raise e
     db.commit()
     db.clear_cache()
 
@@ -884,6 +886,8 @@ def scan_for_media(type, db, user_name=None):
                                 "Error loading:",
                                 os.path.join(fs_base, user_name, media_file + ".json"),
                             )
+                            if debug_mode:
+                                raise e
                 else:
                     related_post_id = "0" + media_file
                     print(

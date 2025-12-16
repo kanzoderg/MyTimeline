@@ -42,7 +42,7 @@ if config.url_base:
 
 
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
 }
 
 
@@ -65,6 +65,11 @@ def create_video_thumbnail(video_path, thumbnail_path):
     ]
     cmd = [str(x) for x in cmd]
     os.system(" ".join(cmd))
+    # if not os.path.exists(thumbnail_path):
+    #     # try again at 00:00:00.000
+    #     cmd[4] = "00:00:00.000"
+    #     if os.system(" ".join(cmd)):
+    #         print("Failed to create video thumbnail for:", video_path)
 
 
 def filter_ascii(text):

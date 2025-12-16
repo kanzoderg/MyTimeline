@@ -271,7 +271,7 @@ body {
     overflow: auto;
 }
 
-.hyperlink {
+.hyperlink, .auto_link {
     color: var(--accent-color-light);
 }
 

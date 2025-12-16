@@ -146,7 +146,7 @@
             deltaY = posY - ogY;
 
             video.style.transition = 'transform 0.3s';
-            next_preview.style.transition = 'transform 0.3s';
+            next_preview.style.transition = 'transform 0.3s, opacity 0.3s';
 
             if (deltaY / window.innerHeight < -0.1) {
                 next_preview.style.transform = 'translateY(-100%)';
@@ -222,6 +222,10 @@
                 video.style.transition = 'none';
                 video.style.transform = 'translateY(0)';
                 video.play();
+                next_preview.style.opacity = 0;
+                setTimeout(() => {
+                    next_preview.style.opacity = 1;
+                }, 300);
             }, 300);
             idx += 1;
             if (item_cnt) {
@@ -285,7 +289,7 @@
         function update_next_preview() {
             // video_preload.src = vid_history[vid_history.length - 1].url;
             setTimeout(() => {
-                next_preview.style.transition = 'none';
+                next_preview.style.transition = 'opacity 0.3s';
                 next_preview.style.transform = 'translateY(0)';
                 next_preview.src = vid_history[vid_history.length - 1].preview;
             }, 300);
@@ -307,7 +311,7 @@
         }
 
         function next_with_transition() {
-            next_preview.style.transition = 'transform 0.3s';
+            next_preview.style.transition = 'transform 0.3s, opacity 0.3s';
             video.style.transition = 'transform 0.3s';
             next_preview.style.transform = 'translateY(-100%)';
             video.style.transform = 'translateY(-100%)';
@@ -432,6 +436,7 @@
         init_video();
         full_opacity();
     </script>
+    <script src="{{url_base}}/js/noreferer.js"></script>
 </body>
 
 </html>
