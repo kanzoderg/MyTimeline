@@ -17,6 +17,28 @@
 <div class="notice_card">
     No posts found.<br> Either the scan didn't complete or the user doesn't exist in database.<br> Try use the <img src="{{url_base}}/img/reload.svg" style="height: 1rem; vertical-align: middle; background-color: #333; border-radius: 1rem; border: 2px solid #ffffff33;" /> download button above, this will re-fetch the user data and trigger a new scan.
 </div>
+<span style="width: 100%; text-align: center; display: block;">or</span>
+{% if type == 'x' %}
+<a class="user_button" href="{{users[user_name].url}}" target="_blank">
+    <img src="{{url_base}}/img/x.svg" />
+    <span>Open on X</span>
+</a>
+{% elif type == 'bsky' %}
+<a class="user_button" href="{{users[user_name].url}}" target="_blank">
+    <img src="{{url_base}}/img/bsky.svg" /> 
+    <span>Open on Bluesky</span>
+</a>
+{% elif type == 'reddit' %}
+<a class="user_button" href="https://www.reddit.com/r/{{user_name}}" target="_blank">
+    <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);"/>
+    <span>Open on Reddit</span>
+</a>
+{% elif type == 'fa' %}
+<a class="user_button" href="https://www.furaffinity.net/user/{{user_name}}" target="_blank">
+    <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);"/>
+    <span>Open on Fur Affinity</span>
+</a>
+{% endif %}
 {% elif sorted_posts_id | length == 0 %}
 <div class="notice_card">
     No posts found.

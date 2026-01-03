@@ -424,7 +424,7 @@ class Post:
         elif self.type == "reddit":
             self.post_id = json["id"]
             self.text_content = (
-                f"<span class='rdt_title'>{json['title']}</span>\n{json['selftext']}"
+                f"<span class='rdt_title'>{json['title']}</span>{json['selftext']}"
             )
             self.user_name = json["subreddit"].lower()
             self.nick = self.user_name
@@ -440,12 +440,12 @@ class Post:
         elif self.type == "fa":
             self.post_id = str(json["id"])
             self.text_content = (
-                f"<span class='rdt_title'>{json['title']}</span>\n{json['description']}"
+                f"<span class='rdt_title'>{json['title']}</span>{json['description']}"
             )
             self.user_name = json["user"].lower()
             self.nick = json.get("artist", self.user_name)
             self.time = json["date"]
-            if json["category"] == "journals":
+            if json.get("subcategory") == "journals" or json.get("category") == "journals":
                 self.url = f"https://www.furaffinity.net/journal/{self.post_id}/"
             else:
                 self.url = f"https://www.furaffinity.net/view/{self.post_id}/"

@@ -13,6 +13,7 @@ arg_parser.add_argument("url")
 arg_parser.add_argument(
     "-o", "--output", default="./downloads", help="Output directory"
 )
+arg_parser.add_argument("-f", "--force", action="store_true", help="Force fetch all.")
 arg_parser.add_argument("--a", default=auth.a, help="Authentication cookie 'a'")
 arg_parser.add_argument("--b", default=auth.b, help="Authentication cookie 'b'")
 
@@ -80,7 +81,9 @@ def put_user_info(user):
         f.write(resp.text)
     description = soup.find(class_="userpage-profile").decode_contents()
     try:
-        user_profile = soup.find(class_="userpage-layout-right-col-content").decode_contents()
+        user_profile = soup.find(
+            class_="userpage-layout-right-col-content"
+        ).decode_contents()
     except Exception as e:
         print(f"Failed to parse user profile for {user}: {e}")
         user_profile = ""
@@ -147,7 +150,7 @@ class Item:
             scan_existing_items(user)
             if id_ in exsisting_items:
                 self.already_exists = True
-                print(f"l141: Already exists: [{ self.id_}] {self.user}")
+                print(f"l150: Already exists: [{ self.id_}] {self.user}")
 
     def parse(self):
         if not self.available:
@@ -259,7 +262,8 @@ class Item:
             data = {
                 "user": self.user,
                 "artist": self.artist,
-                "category": self.category,
+                "category": "furaffinity",
+                "subcategory": self.category,
                 "title": self.title,
                 "link": self.link,
                 "id": self.id_,
@@ -350,6 +354,8 @@ class Pager:
 
 
 def main():
+    skip_count = 0
+
     gallery_pattern = r"https://www\.furaffinity\.net/view/(\d+)"
     journal_pattern = r"https://www\.furaffinity\.net/journal/(\d+)"
     user_content_pattern = (
@@ -377,6 +383,11 @@ def main():
         user = m.group(2)
         pager = Pager(user, category)
         for item in pager.items():
+            if item.already_exists:
+                skip_count += 1
+            if skip_count >= 20 and not args.force:
+                print("Skipping remaining items due to consecutive existing items.")
+                break
             item.parse()
             item.fetch()
     elif re.match(user_pattern, args.url):
@@ -385,6 +396,12 @@ def main():
         for category in ["gallery", "scraps", "journals"]:
             pager = Pager(user, category)
             for item in pager.items():
+                if item.already_exists:
+                    skip_count += 1
+                if skip_count >= 20 and not args.force:
+                    print("Skipping remaining items due to consecutive existing items.")
+                    skip_count = 0
+                    break
                 item.parse()
                 item.fetch()
     else:

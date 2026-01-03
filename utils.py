@@ -25,9 +25,7 @@ print("Using python interpreter:", current_python)
 if not config.custom_gallery_dl_location:
     py_exec_path = os.path.dirname(current_python)
     if py_exec_path and os.path.exists(os.path.join(py_exec_path, "gallery-dl")):
-        config.custom_gallery_dl_location = os.path.join(
-            py_exec_path, "gallery-dl"
-        )
+        config.custom_gallery_dl_location = os.path.join(py_exec_path, "gallery-dl")
     print("Using gallery-dl location:", config.custom_gallery_dl_location)
 
 config.fs_bases["x"] = os.path.expanduser(config.fs_bases["x"])
@@ -334,11 +332,11 @@ def embed_hyperlink(type, text_content):
                 f"<a class='hyperlink' href='{https_url}' target=\"_blank\">{url_display_text}</a>",
             )
         if type == "x":
-            user_url = "https://x.com/{user}"
-            hastag_url = "https://x.com/hashtag/{tag}"
+            user_url = config.url_base + "/user/x/{user}"
+            hastag_url = config.url_base +"/tl?q={tag}"
         else:
-            user_url = "https://bsky.app/profile/{user}"
-            hastag_url = "https://bsky.app/hashtag/{tag}"
+            user_url = config.url_base + "/user/bsky/{user}"
+            hastag_url = config.url_base +"/tl?q={tag}"
         mentions = [i[1] for i in mention_pattern.findall(text_content)]
         mentions = list(set(mentions))
         hashtags = [i[1] for i in hashtag_pattern.findall(text_content)]
@@ -346,14 +344,20 @@ def embed_hyperlink(type, text_content):
         for mention in mentions:
             if mention.endswith("."):
                 mention = mention[:-1]
+            if not mention:
+                continue
             text_content = text_content.replace(
                 f"@{mention}",
-                f"<a class='hyperlink' href='{user_url.format(user=mention)}' target=\"_blank\">@{mention}</a>",
+                f"<a class='iconusername' href='{user_url.format(user=mention)}'>@{mention}</a>",
             )
         for hashtag in hashtags:
+            if hashtag.endswith("."):
+                hashtag = hashtag[:-1]
+            if not hashtag:
+                continue
             text_content = text_content.replace(
                 f"#{hashtag}",
-                f"<a class='hyperlink' href='{hastag_url.format(tag=hashtag)}' target=\"_blank\">#{hashtag}</a>",
+                f"<a class='iconusername' href='{hastag_url.format(tag=hashtag)}'>#{hashtag}</a>",
             )
         text_content = text_content.replace("\n", "<br>")
     elif type == "fa":

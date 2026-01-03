@@ -19,7 +19,7 @@
     margin-top: -3rem;
     border-radius: 6rem;
     border: var(--bg-color) 0.3rem solid;
-    background-color: #666;
+    background-color: var(--bg-color);
 }
 
 .user_header {
@@ -45,8 +45,9 @@
     padding: 1rem;
     font-size: 0.9rem;
     max-height: 40vh;
-    overflow-x: hidden;
-    overflow-y: auto;
+    /* overflow-x: hidden;
+    overflow-y: auto; */
+    overflow: auto;
 }
 
 .user_header_button{

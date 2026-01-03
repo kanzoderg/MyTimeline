@@ -86,6 +86,7 @@ def _img(fn):
 @app.route(posixpath.join("/", config.url_base, "avatar", "<type>", "<name>"))
 def _avatar(type, name):
     # print(type, name)
+    name = name.lower()
     if not type or type == "None":
         return send_file("img/default_avatar.png", mimetype="image/jpeg")
     fn = f"{config.fs_bases[type]}/{name}/avatar"
@@ -95,6 +96,10 @@ def _avatar(type, name):
         user.load_from_db(db)
         avatar_url = user.avatar
         if (not user.avatar) or (not avatar_url.startswith("http")) or user.flagged:
+            if os.path.exists(f"tmp/.cached/{name}.gif"):
+                return set_cache_header(
+                    send_file(f"tmp/.cached/{name}.gif", mimetype="image/gif")
+                )
             if user.flagged:
                 logger.log(name, "is flagged, skip avatar downloading.")
             if os.path.exists(fn_bck):
@@ -466,6 +471,7 @@ def _timeline_user(type, name):
     else:
         tab = "posts"
 
+    name = name.lower()
     user = backend.User(name, type)
     user.load_from_db(db)
     if not user.url:
@@ -688,6 +694,8 @@ def _add_download_job():
     # print("Received data:", data)
     if "url" in data and data["url"]:
         url = data["url"]
+        if "?" in url:
+            url = url.split("?")[0]
         full = data.get("full", False)
         media_only = data.get("media_only", False)
         if not (
