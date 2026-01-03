@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Logs</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+
+        .log-entry {
+            /* margin-bottom: 5px; */
+            border-bottom: 1px solid #ccc;
+        }
+
+        #live {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background-color: #fff;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .info {
+            color: #000;
+        }
+        .error {
+            color: red;
+        }
+        .attention {
+            color: blue;
+        }
+    </style>
+</head>
+
+<body>
+    {% for line in log_lines %}
+    <div class="log-entry {{ line[0] }}">{{ line[1] }}</div>
+    {% endfor %}
+    <div id="live">
+        <input type="radio" id="live_update" name="live_update" onclick="toggle_live()">
+        <label for="live_update">Live Update</label>
+    </div>
+    <script>
+        let live = localStorage.getItem("live_update") === "true";
+        document.getElementById("live_update").checked = live;
+        function toggle_live() {
+            live = !live;
+            localStorage.setItem("live_update", live);
+            location.reload();
+        }
+        if (live) {
+            setInterval(() => {
+                location.reload();
+            }, 2000);
+        }
+        else {
+            setTimeout(() => {
+                window.scrollTo(0, document.body.scrollHeight);
+                console.log("Scrolled to bottom");
+            }, 100);
+        }
+    </script>
+</body>
+
+</html>

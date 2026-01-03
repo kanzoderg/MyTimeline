@@ -6,7 +6,7 @@ from hashlib import md5
 from threading import Thread, Lock
 import requests
 
-import config, backend
+import config, backend, logger
 from run_command import run_command
 
 global_lock = Lock()
@@ -20,13 +20,14 @@ busy_flag = False
 current_python = sys.executable
 if not current_python:
     current_python = "python3"
-print("Using python interpreter:", current_python)
+logger.log("Using python interpreter:", current_python)
 
 if not config.custom_gallery_dl_location:
     py_exec_path = os.path.dirname(current_python)
     if py_exec_path and os.path.exists(os.path.join(py_exec_path, "gallery-dl")):
         config.custom_gallery_dl_location = os.path.join(py_exec_path, "gallery-dl")
-    print("Using gallery-dl location:", config.custom_gallery_dl_location)
+    logger.log("Using gallery-dl location:", config.custom_gallery_dl_location)
+
 
 config.fs_bases["x"] = os.path.expanduser(config.fs_bases["x"])
 config.fs_bases["bsky"] = os.path.expanduser(config.fs_bases["bsky"])
@@ -67,7 +68,7 @@ def create_video_thumbnail(video_path, thumbnail_path):
     #     # try again at 00:00:00.000
     #     cmd[4] = "00:00:00.000"
     #     if os.system(" ".join(cmd)):
-    #         print("Failed to create video thumbnail for:", video_path)
+    #         logger.log("Failed to create video thumbnail for:", video_path)
 
 
 def filter_ascii(text):
@@ -83,9 +84,9 @@ def create_thumbnail(path, thumbnail_size=config.thubnail_size):
     thumbnail_path = md5(path.encode()).hexdigest() + f"_{thumbnail_size}.jpg"
     thumbnail_path = os.path.join(config.cache_path, thumbnail_path)
     if os.path.exists(thumbnail_path):
-        # print("Thumbnail exists:", thumbnail_path)
+        # logger.log("Thumbnail exists:", thumbnail_path)
         return thumbnail_path
-    print("Creating thumbnail:", thumbnail_path)
+    logger.log("Creating thumbnail:", thumbnail_path, verbose=1)
     if path.split(".")[-1].lower() in ["mp4", "mov", "avi", "mkv", "webm", "m4v"]:
         create_video_thumbnail(path, thumbnail_path)
     elif path.split(".")[-1].lower() in [
@@ -99,8 +100,8 @@ def create_thumbnail(path, thumbnail_size=config.thubnail_size):
     ]:
         create_image_thumbnail(path, thumbnail_path, thumbnail_size)
     else:
-        print("Unsupported file type for thumbnail:", path)
-        print("Still trying to create thumbnail with video method.")
+        logger.log("Unsupported file type for thumbnail:", path)
+        logger.log("Still trying to create thumbnail with video method.")
         create_video_thumbnail(path, thumbnail_path)
     return thumbnail_path
 
@@ -117,8 +118,8 @@ class DownloadWorker(Thread):
                 with global_lock:
                     if len(download_jobs) > 0:
                         current_url, full, media_only = download_jobs.pop(0)
-                        print("-->", current_url, full, media_only)
-                        print(f"Downloading {current_url}")
+                        logger.log("-->", current_url, full, media_only)
+                        logger.log(f"Downloading {current_url}")
                     else:
                         time.sleep(1)
                         continue
@@ -130,7 +131,7 @@ class DownloadWorker(Thread):
                     # cookies not avalible yet
                     name = re.search(r"profile/([a-zA-Z0-9\-\_\.]+)", current_url)
                     if not name:
-                        print("Invalid bsky URL:", current_url)
+                        logger.log("Invalid bsky URL:", current_url)
                         continue
                     name = name.group(1).lower()
                     cmd += [
@@ -151,7 +152,7 @@ class DownloadWorker(Thread):
                         r"x.com/([a-zA-Z0-9\-\_\.]+)", current_url
                     ) or re.search(r"twitter.com/([a-zA-Z0-9\-\_\.]+)", current_url)
                     if not name:
-                        print("Invalid x.com URL:", current_url)
+                        logger.log("Invalid x.com URL:", current_url)
                         continue
                     name = name.group(1).lower()
                     if config.cookies_list["x"]:
@@ -182,7 +183,7 @@ class DownloadWorker(Thread):
                 elif "reddit.com" in current_url:
                     name = re.search(r"reddit.com/r/([a-zA-Z0-9\-\_\.]+)", current_url)
                     if not name:
-                        print("Invalid reddit URL:", current_url)
+                        logger.log("Invalid reddit URL:", current_url)
                         continue
                     name = name.group(1).lower()
                     cmd += [
@@ -199,7 +200,7 @@ class DownloadWorker(Thread):
                         current_url,
                     )
                     if not name:
-                        print("Guessing username now...")
+                        logger.log("Guessing username now...")
                         user_fs_path = os.path.expanduser(config.fs_bases["fa"])
                         existing_users = os.listdir(user_fs_path)
                         existing_users.sort(
@@ -210,7 +211,7 @@ class DownloadWorker(Thread):
                         )
                         if existing_users:
                             name = existing_users[0]
-                            print("Using most recently updated user:", name)
+                            logger.log("Using most recently updated user:", name)
                         else:
                             name = "ignore"
                     else:
@@ -224,9 +225,9 @@ class DownloadWorker(Thread):
                     ]
                     type = "fa"
                 else:
-                    print("Unsupported URL:", current_url)
+                    logger.log("Unsupported URL:", current_url)
                     continue
-                print("User:", name, "Type:", type)
+                logger.log("User:", name, "Type:", type)
 
                 def trigger_action():
                     backend.flag_user(self.db, name, type)
@@ -247,15 +248,15 @@ class DownloadWorker(Thread):
                     self.db.commit()
                     has_new_download = True
                     backend.query_cache = dict()
-                    print(name, "downloaded")
+                    logger.log(name, "downloaded")
                     busy_flag = False
                 except Exception as e:
                     busy_flag = False
-                    print(e)
-                    print("Scan Failed.")
+                    logger.log(e, type="error")
+                    logger.log("Scan Failed.", type="error")
                 current_url = ""
             except Exception as e:
-                print("Error in download worker:", e)
+                logger.log("Error in download worker:", e, type="error")
                 time.sleep(1)
 
 
@@ -271,10 +272,10 @@ def update_daemon():
             else:
                 continue
             download_jobs.append((url, False, True))
-            print(f"[update daemon] Added {url} to queue.")
+            logger.log(f"[update daemon] Added {url} to queue.")
             time.sleep(10)
     except Exception as e:
-        print("[update daemon]", e)
+        logger.log("[update daemon]", e, type="error")
         time.sleep(10)
 
 
@@ -326,7 +327,7 @@ def embed_hyperlink(type, text_content):
             url_display_text = https_url.replace("https://", "")
             if len(url_display_text) > 40:
                 url_display_text = url_display_text[:40] + "..."
-            # print("url:", url, https_url, url_display_text)
+            # logger.log("url:", url, https_url, url_display_text)
             text_content = text_content.replace(
                 url,
                 f"<a class='hyperlink' href='{https_url}' target=\"_blank\">{url_display_text}</a>",
@@ -395,10 +396,10 @@ def get_reddit_about(subreddit_name):
             data = response.json()
             return data.get("data", {})
         else:
-            print(
+            logger.log(
                 f"Failed to fetch subreddit info. Status code: {response.status_code}"
             )
             return {}
     except Exception as e:
-        print(f"Error fetching subreddit info: {e}")
+        logger.log(f"Error fetching subreddit info: {e}", type="error")
         return {}

@@ -3,7 +3,7 @@ import os, json, re, time, sys
 import natsort, random
 import threading
 
-import config, utils
+import config, utils, logger
 
 debug_mode = False
 
@@ -32,7 +32,9 @@ class Database:
             flagged BOOLEAN DEFAULT 0
         )"""
         )
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name)"
+        )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_udid ON users(udid)")
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS posts (
@@ -51,9 +53,7 @@ class Database:
             real_user TEXT
         )"""
         )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_posts_uid ON posts(uid)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_posts_uid ON posts(uid)")
         cursor.execute(
             """CREATE TABLE IF NOT EXISTS media (
             media_id TEXT PRIMARY KEY,
@@ -65,9 +65,7 @@ class Database:
         )"""
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_media_post_id ON media(post_id)")
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_media_uid ON media(uid)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_media_uid ON media(uid)")
         fav_cursor = self.fav_conn.cursor()
         fav_cursor.execute(
             """CREATE TABLE IF NOT EXISTS fav (
@@ -152,9 +150,7 @@ class Database:
             )
             cursor.close()
 
-    def insert_or_update_media(
-        self, media_id, post_id, file_name, uid, type, time
-    ):
+    def insert_or_update_media(self, media_id, post_id, file_name, uid, type, time):
         with self.db_lock:
             cursor = self.conn.cursor()
             cursor.execute(
@@ -192,11 +188,11 @@ class Database:
     def raw_query(self, sql, selected_db="main", ignore_cache=False):
         global query_cache
         if len(query_cache) > 5000:
-            # print("Clear query cache.")
+            # logger.log("Clear query cache.")
             query_cache = dict()
         if sql in query_cache and not ignore_cache:
             if debug_mode:
-                print("Use cached raw query for", sql)
+                logger.log("Use cached raw query for", sql, verbose=1)
             return query_cache[sql]
         else:
             with self.db_lock:
@@ -225,15 +221,14 @@ class Database:
         )
         if words in self.cached_query_words:
             if abs(self.cached_query_words[words][0] - time.time()) > 1200:
-                print("Clear outdated query cache.")
+                logger.log("Clear outdated query cache.")
                 self.cached_query_words = dict()
             else:
-                print("Use cached query for", words)
+                logger.log("Use cached query for", words)
                 return self.cached_query_words[words][1]
-        print("Querying posts by text:", words)
+        logger.log("Querying posts by text:", words)
         placeholders = " AND ".join(
-            ["(text_content || ' ' || nick || real_user) LIKE ?"]
-            * len(words)
+            ["(text_content || ' ' || nick || real_user) LIKE ?"] * len(words)
         )
         sql_query = f"SELECT post_id, time FROM posts WHERE {placeholders}"
         params = tuple([f"%{word}%" for word in words])
@@ -250,15 +245,14 @@ class Database:
         )
         if words in cache_query_media_id:
             if abs(cache_query_media_id[words][0] - time.time()) > 1200:
-                print("Clear outdated query cache.")
+                logger.log("Clear outdated query cache.")
                 cache_query_media_id = dict()
             else:
-                print("Use cached query for", words)
+                logger.log("Use cached query for", words)
                 return cache_query_media_id[words][1]
-        print("Querying media by text:", words)
+        logger.log("Querying media by text:", words)
         placeholders = " AND ".join(
-            ["(text_content || ' ' || nick || real_user) LIKE ?"]
-            * len(words)
+            ["(text_content || ' ' || nick || real_user) LIKE ?"] * len(words)
         )
         sql_query = f"SELECT media_id, time FROM media WHERE (file_name LIKE '%.mp4' OR file_name LIKE '%.webm' OR file_name LIKE '%.m4v') AND post_id IN (SELECT post_id FROM posts WHERE {placeholders})"
         params = tuple([f"%{word}%" for word in words])
@@ -300,7 +294,7 @@ class Embed:
         # check if user exists
         rows = db.query_rows("users", "udid", self.udid)
         if len(rows) == 0:
-            print(f"User {self.udid} not found in database")
+            logger.log(f"User {self.udid} not found in database")
             return False
         self.uid = rows[0][0]
         self.user_name = rows[0][1]
@@ -308,7 +302,7 @@ class Embed:
         # check if post exists
         rows = db.query_rows("posts", "post_id", self.post_id)
         if len(rows) == 0:
-            print(f"Post {self.post_id} not found in database")
+            logger.log(f"Post {self.post_id} not found in database")
             return False
         self.text_content = rows[0][1]
         self.text_content = utils.embed_hyperlink(self.type, self.text_content)
@@ -319,7 +313,7 @@ class Embed:
         for row in rows:
             # Extract user_name from uid
             uid = row[3]
-            user_name = uid.split('@')[0] if '@' in uid else uid
+            user_name = uid.split("@")[0] if "@" in uid else uid
             media = Media(row[0], row[1], user_name, self.type, row[5])
             media.file_name = row[2]
             media.load_from_db(db)
@@ -348,8 +342,8 @@ class Post:
         row = rows[0]
         self.uid = row[2]
         # Extract user_name and type from uid if not already set
-        if self.uid and '@' in self.uid:
-            parts = self.uid.rsplit('@', 1)
+        if self.uid and "@" in self.uid:
+            parts = self.uid.rsplit("@", 1)
             if not self.user_name:
                 self.user_name = parts[0]
             if not self.type:
@@ -445,7 +439,10 @@ class Post:
             self.user_name = json["user"].lower()
             self.nick = json.get("artist", self.user_name)
             self.time = json["date"]
-            if json.get("subcategory") == "journals" or json.get("category") == "journals":
+            if (
+                json.get("subcategory") == "journals"
+                or json.get("category") == "journals"
+            ):
                 self.url = f"https://www.furaffinity.net/journal/{self.post_id}/"
             else:
                 self.url = f"https://www.furaffinity.net/view/{self.post_id}/"
@@ -514,12 +511,24 @@ class User:
                 self.nick = self.user_name
             return True
         except Exception as e:
-            print(f"Error loading user {self.user_name} from database: {e}")
-            print(rows)
+            logger.log(
+                f"Error loading user {self.user_name} from database: {e}", type="error"
+            )
+            logger.log(rows, type="error")
             return False
 
     def load_from_inline(
-        self, uid, user_name, nick, udid, avatar, banner, description, type, update_time, flagged
+        self,
+        uid,
+        user_name,
+        nick,
+        udid,
+        avatar,
+        banner,
+        description,
+        type,
+        update_time,
+        flagged,
     ):
         self.uid = uid
         self.user_name = user_name
@@ -559,29 +568,42 @@ class User:
             try:
                 self.banner = json["author"]["profile_banner"]
             except:
-                print(
-                    f"warning: user {self.user_name} has no banner.\ndownload again with lasest gallery-dl version to fix this."
+                logger.log(
+                    f"warning: user {self.user_name} has no banner.\ndownload again with lasest gallery-dl version to fix this.",
+                    type="error",
                 )
             try:
                 self.description = json["author"]["description"]
             except:
-                print(
-                    f"warning: user {self.user_name} has nodescription.\ndownload again with lasest gallery-dl version to fix this."
+                logger.log(
+                    f"warning: user {self.user_name} has nodescription.\ndownload again with lasest gallery-dl version to fix this.",
+                    type="error",
                 )
         elif self.type == "bsky":
             self.nick = json["author"]["displayName"]
             self.udid = json["author"]["did"]
-            self.avatar = json["author"]["avatar"]
+            try:
+                self.avatar = json["author"]["avatar"]
+            except:
+                self.avatar = ""
+                logger.log(
+                    f"warning: user {self.user_name} has no avatar.\ndownload again with lasest gallery-dl version to fix this.",
+                    type="error",
+                )
             self.banner = ""
             self.description = ""
             try:
                 self.banner = json["user"]["banner"]
             except:
-                print(f"warning: user {self.user_name} has no banner.")
+                logger.log(
+                    f"warning: user {self.user_name} has no banner.", type="error"
+                )
             try:
                 self.description = json["user"]["description"]
             except:
-                print(f"warning: user {self.user_name} has no description.")
+                logger.log(
+                    f"warning: user {self.user_name} has no description.", type="error"
+                )
         elif self.type == "reddit":
             self.nick = self.user_name
             self.udid = self.user_name
@@ -600,8 +622,9 @@ class User:
                     or about_json.get("icon_img", "").split("?")[0]
                 )
             except Exception as e:
-                print(
-                    f"warning: could not fetch reddit about for {self.user_name}: {e}"
+                logger.log(
+                    f"warning: could not fetch reddit about for {self.user_name}: {e}",
+                    type="error",
                 )
         elif self.type == "fa":
             self.nick = json["display_name"]
@@ -663,8 +686,8 @@ class Media:
                 return False
             self.uid = row[3]
             # Extract user_name and type from uid if not already set
-            if self.uid and '@' in self.uid:
-                parts = self.uid.rsplit('@', 1)
+            if self.uid and "@" in self.uid:
+                parts = self.uid.rsplit("@", 1)
                 if not self.user_name:
                     self.user_name = parts[0]
                 if not self.type:
@@ -677,8 +700,8 @@ class Media:
             self.isflash = self.file_name.split(".")[-1] in valid_flash_types
             self.isattachment = self.file_name.split(".")[-1] in valid_attachment_types
         except Exception as e:
-            print("Error:", e)
-            print("Rows:", rows)
+            logger.log("Error:", e, type="error")
+            logger.log("Rows:", rows, type="error")
             return False
         return True
 
@@ -694,11 +717,11 @@ def bsky_link_fix(text, facets):
                 if length < len(uri):
                     shortened_uri = uri[: length - 3] + "..."
                     text = text.replace(shortened_uri, uri)
-                    # print(
+                    # logger.log(
                     #     f"warning: bsky link {shortened_uri} is shortened, replaced with {uri}"
                     # )
     except Exception as e:
-        print(f"Error fixing bsky link: {e}")
+        logger.log(f"Error fixing bsky link: {e}", type="error")
     return text
 
 
@@ -714,48 +737,52 @@ def scan_for_users(type, db, user_name=None):
     else:
         user_names = [user_name]
     for user_name in user_names:
-        if not os.path.exists(os.path.join(fs_base, user_name)):
-            print(user_name, "does not exists!")
-            continue
-        elif not os.path.isdir(os.path.join(fs_base, user_name)):
-            print(user_name, "is not a dir!")
-            continue
-        elif user_name.startswith("."):
-            continue
-        print(f"scanning for user {user_name}".ljust(80, " "), end="\r")
-        sys.stdout.flush()
-        user = User(user_name, type)
-        if not user.load_from_db(db, True) or len(user_names) == 1:
-            # user not found in database, create a new entry
-            # select the first json file
-            if type == "fa":
-                if os.path.exists(os.path.join(fs_base, user_name, "user.json")):
-                    json_files = ["user.json"]
-                else:
-                    json_files = []
-            elif type in ["x", "bsky", "reddit"]:
-                file_list = os.listdir(os.path.join(fs_base, user_name))
-                json_files = [f for f in file_list if f.endswith(".json")]
-                json_files.sort(reverse=True)
-            if len(json_files) > 0:
-                with open(
-                    os.path.join(fs_base, user_name, json_files[0]),
-                    "r",
-                    encoding="utf=8",
-                ) as f:
-                    user_json = json.load(f)
-                    if len(user_names) == 1:
-                        user.load_from_json(user_json, db)
+        try:
+            if not os.path.exists(os.path.join(fs_base, user_name)):
+                logger.log(user_name, "does not exists!")
+                continue
+            elif not os.path.isdir(os.path.join(fs_base, user_name)):
+                logger.log(user_name, "is not a dir!")
+                continue
+            elif user_name.startswith("."):
+                continue
+            logger.log(f"scanning for user {user_name}")
+            user = User(user_name, type)
+            if not user.load_from_db(db, True) or len(user_names) == 1:
+                # user not found in database, create a new entry
+                # select the first json file
+                if type == "fa":
+                    if os.path.exists(os.path.join(fs_base, user_name, "user.json")):
+                        json_files = ["user.json"]
                     else:
-                        user.load_from_json(user_json, db, True)
-            else:
-                # no json file found, use dummy values
-                user.nick = user_name
-                user.avatar = ""
-                user.banner = ""
-                user.description = ""
-                user.update_time = time.time()
-                user.save_to_db(db)
+                        json_files = []
+                elif type in ["x", "bsky", "reddit"]:
+                    file_list = os.listdir(os.path.join(fs_base, user_name))
+                    json_files = [f for f in file_list if f.endswith(".json")]
+                    json_files.sort(reverse=True)
+                if len(json_files) > 0:
+                    logger.log(f"found user json file: {json_files[0]}")
+                    with open(
+                        os.path.join(fs_base, user_name, json_files[0]),
+                        "r",
+                        encoding="utf=8",
+                    ) as f:
+                        user_json = json.load(f)
+                        if len(user_names) == 1:
+                            user.load_from_json(user_json, db)
+                        else:
+                            user.load_from_json(user_json, db, True)
+                else:
+                    # no json file found, use dummy values
+                    user.nick = user_name
+                    user.avatar = ""
+                    user.banner = ""
+                    user.description = ""
+                    user.update_time = time.time()
+                    user.save_to_db(db)
+        except Exception as e:
+            logger.log(e, type="error")
+            logger.log("Error loading user:", user_name, type="error")
     db.clear_cache()
     all_users = get_users(db)
 
@@ -769,11 +796,10 @@ def scan_for_posts(type, db, user_name=None):
     else:
         user_names = [user_name]
     for cnt, user_name in enumerate(user_names):
-        print(
+        logger.log(
             f"[{cnt+1}/{len(user_names)}] scanning for posts of user {user_name}".ljust(
                 90, " "
-            ),
-            end="\r",
+            )
         )
         sys.stdout.flush()
         filelist = os.listdir(os.path.join(fs_base, user_name))
@@ -800,9 +826,7 @@ def scan_for_posts(type, db, user_name=None):
             for pat in patterns["file_patterns"]:
                 post_files += [f for f in json_files if re.match(pat, f)]
             for post_file in post_files:
-                # print(post_file)
                 post_id = re.match(patterns["id_pattern"], post_file).group(1)
-                # print("matching post_id:", post_id)
                 post = Post(post_id, user_name, type)
                 if not post.load_from_db(db) or len(user_names) == 1:
                     with open(
@@ -814,10 +838,11 @@ def scan_for_posts(type, db, user_name=None):
                             post_json = json.load(f)
                             post.load_from_json(post_json, db)
                         except Exception as e:
-                            print(e)
-                            print(
+                            logger.log(e, type="error")
+                            logger.log(
                                 "Error loading:",
                                 os.path.join(fs_base, user_name, post_file),
+                                type="error",
                             )
                             if debug_mode:
                                 raise e
@@ -834,12 +859,10 @@ def scan_for_media(type, db, user_name=None):
     else:
         user_names = [user_name]
     for cnt, user_name in enumerate(user_names):
-        print(
+        logger.log(
             f"[{cnt+1}/{len(user_names)}] scanning for media of user {user_name}".ljust(
                 90, " "
-            ),
-            end="\r",
-            flush=True,
+            )
         )
         filelist = os.listdir(os.path.join(fs_base, user_name))
         # check if is file
@@ -860,10 +883,14 @@ def scan_for_media(type, db, user_name=None):
                     id_pattern = r"(\d+)"
                 try:
                     related_post_id = re.match(id_pattern, media_file).group(1)
-                    # print("matching post_id from filename:", related_post_id)
+                    # logger.log("matching post_id from filename:", related_post_id)
                 except:
                     related_post_id = "0" + media_file
-                    print("warning: no post_id found in filename:", media_file)
+                    logger.log(
+                        "warning: no post_id found in filename:",
+                        media_file,
+                        type="error",
+                    )
                 if related_post_id in ["redgifs", "tumblr", "imgur", "gfycat"]:
                     related_post_id = "-1" + user_name + "_" + related_post_id
             elif type == "fa":
@@ -880,17 +907,18 @@ def scan_for_media(type, db, user_name=None):
                             post_json = json.load(f)
                             related_post_id = str(post_json["id"])
                         except Exception as e:
-                            print(e)
+                            logger.log(e)
                             related_post_id = "0" + media_file
-                            print(
+                            logger.log(
                                 "Error loading:",
                                 os.path.join(fs_base, user_name, media_file + ".json"),
+                                type="error",
                             )
                             if debug_mode:
                                 raise e
                 else:
                     related_post_id = "0" + media_file
-                    print(
+                    logger.log(
                         "warning: no json file found for media:",
                         os.path.join(fs_base, user_name, media_file + ".json"),
                     )
@@ -899,14 +927,16 @@ def scan_for_media(type, db, user_name=None):
             # test if related post exists
             post = Post(related_post_id, user_name, type)
             if not post.load_from_db(db):
-                print(
+                logger.log(
                     f"warning: media {media_id} has no related post {related_post_id} in database"
                 )
                 # create a dummy post
                 post.text_content = media_file
                 post.user_name = user_name
                 guessed_timestamp = re.search(r"\d{10}", media_id)
-                if guessed_timestamp and time.gmtime() > time.gmtime(int(guessed_timestamp.group(0))):
+                if guessed_timestamp and time.gmtime() > time.gmtime(
+                    int(guessed_timestamp.group(0))
+                ):
                     post.time = time.strftime(
                         "%Y-%m-%d %H:%M:%S",
                         time.gmtime(int(guessed_timestamp.group(0))),
@@ -947,18 +977,29 @@ def get_users(db):
         uid = row[0]
         user_name = row[1]
         # Extract type from uid
-        type = uid.split('@')[1] if '@' in uid else row[7]
+        type = uid.split("@")[1] if "@" in uid else row[7]
         user = User(user_name, type)
-        user.load_from_inline(row[0], row[1], row[3], row[2], row[4], row[5], row[6], row[7], row[8], row[9])
+        user.load_from_inline(
+            row[0],
+            row[1],
+            row[3],
+            row[2],
+            row[4],
+            row[5],
+            row[6],
+            row[7],
+            row[8],
+            row[9],
+        )
         users.append(user)
     users.sort(key=lambda u: u.update_time, reverse=True)
     return users
 
 
-def flag_user(db:Database, user_name, type):
+def flag_user(db: Database, user_name, type):
     uid = f"{user_name}@{type}"
-    # print(f"*********Flagging user {uid}")
-    # print(f"UPDATE users SET flagged = 1 WHERE uid = \"{uid}\"")
+    # logger.log(f"*********Flagging user {uid}")
+    # logger.log(f"UPDATE users SET flagged = 1 WHERE uid = \"{uid}\"")
     db.raw_query(f'UPDATE users SET flagged = 1 WHERE uid = "{uid}"', "main", True)
     db.commit()
 
@@ -986,7 +1027,7 @@ valid_media_types = (
 )
 
 
-def build_cache(db:Database):
+def build_cache(db: Database):
     global cache_all_posts_id, cache_all_media_id, cache_user_media_id, cache_all_posts_id_top, cache_all_posts_id_random, query_cache
 
     # debug, skip cache building
@@ -1024,20 +1065,22 @@ def build_cache(db:Database):
     query_cache = dict()
 
 
-def get_fav(db:Database):
+def get_fav(db: Database):
     return db.query_rows(selected_db="fav", key="", value="", ignore_cache=True)
 
 
-def add_favorite(db:Database, post_id):
+def add_favorite(db: Database, post_id):
     if not db.query_rows("posts", "post_id", post_id):
         return
     db.raw_query(
-        f"INSERT OR REPLACE INTO fav VALUES ('{post_id}', '{time.ctime()}')", "fav", True
+        f"INSERT OR REPLACE INTO fav VALUES ('{post_id}', '{time.ctime()}')",
+        "fav",
+        True,
     )
     db.commit()
 
 
-def remove_favorite(db:Database, post_id):
+def remove_favorite(db: Database, post_id):
     db.raw_query(f"DELETE FROM fav WHERE post_id = '{post_id}'", "fav", True)
     db.commit()
 

@@ -3,6 +3,10 @@ import subprocess
 import time
 import signal
 
+import logger
+# set environment variables to disable stdio buffering for subprocesses
+os.environ["PYTHONUNBUFFERED"] = "1"
+
 def run_command(
     command, stop_keywords=None, stop_keywords_max_cnt=12, unbuffered=True, triggers=[]
 ):
@@ -13,7 +17,7 @@ def run_command(
         stop_keywords = []
     if isinstance(command, list):
         command = " ".join(command)
-    print(f"[Running command] {command}")
+    logger.log(f"[Running command] {command}")
     # Add stdbuf for line buffering on non-Python commands
     if unbuffered:
         command = f"stdbuf -oL -eL {command}"
@@ -35,18 +39,18 @@ def run_command(
             if output == "" and process.poll() is not None:
                 break
             if output:
-                print(output.strip(), flush=True)
+                logger.log(output.strip())
                 if any(keyword in output for keyword in stop_keywords):
                     stop_keywords_cnt += 1
-                    # print(f"[Stop keyword found: {output.strip()}]")
-                    # print(f"[Stop keywords count: {stop_keywords_cnt}]")
+                    # logger.log(f"[Stop keyword found: {output.strip()}]")
+                    # logger.log(f"[Stop keywords count: {stop_keywords_cnt}]")
                     if stop_keywords_cnt >= stop_keywords_max_cnt:
-                        print(f"[Stopping command]")
+                        logger.log(f"[Stopping command]")
                         time.sleep(0.4)
                         os.killpg(os.getpgid(process.pid), signal.SIGTERM)
                         time.sleep(1)
                         if process.poll() is None:  # Check if the process is still running
-                            print(f"[Force killing command]")
+                            logger.log(f"[Force killing command]")
                             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
                         break
                 else:
@@ -55,30 +59,30 @@ def run_command(
                     )
                 for trigger, callback in triggers:
                     if trigger in output:
-                        print(f"[Trigger '{trigger}' activated]")
+                        logger.log(f"[Trigger '{trigger}' activated]")
                         callback()
     except KeyboardInterrupt:
-        print("Command interrupted by user.")
+        logger.log("Command interrupted by user.")
         time.sleep(0.4)
         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
     except Exception as e:
-        print(f"[Error] {e}")
+        logger.log(f"[Error] {e}")
         time.sleep(0.4)
         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
     finally:
         errout = process.stderr.read()
         if errout:
-            print(f"[Error output] {errout.strip()}", flush=True)
+            logger.log(f"[Error output] {errout.strip()}")
             # Handle trigger actions for stderr output
             for trigger, callback in triggers:
                 if trigger in errout:
-                    print(f"[Trigger '{trigger}' activated from stderr]")
+                    logger.log(f"[Trigger '{trigger}' activated from stderr]")
                     callback()
         process.stdout.close()
         process.stderr.close()
         try:
             process.wait(timeout=5)  # Wait for the process to terminate
         except subprocess.TimeoutExpired:
-            print("Process did not terminate in time, killing it.")
+            logger.log("Process did not terminate in time, killing it.")
             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-        print(f"[Command finished with exit code {process.returncode}]")
+        logger.log(f"[Command finished with exit code {process.returncode}]")

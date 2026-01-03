@@ -30,7 +30,7 @@ input:focus {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #ffffff33;
+    background: #ffffff22;
     border-radius: 4px;
 }
 
@@ -40,11 +40,11 @@ input:focus {
 
 body {
     --text-color: #fff;
-    --bg-color: #111;
+    --bg-color: #000000;
     --accent-color: #f00;
     --accent-color-dark: #500;
     --accent-color-light: rgb(43, 188, 255);
-    --bg-with-alpha: rgba(16, 16, 16, 0.8);
+    --bg-with-alpha: rgba(0, 0, 0, 0.8);
     --bg-light: rgba(255, 255, 255, 0.2);
 
     color: var(--text-color);
@@ -53,6 +53,7 @@ body {
     height: 100vh;
     text-align: center;
     overflow: hidden;
+    user-select: none;
 }
 
 .nav {
@@ -63,7 +64,7 @@ body {
     left: 0;
     width: 100%;
     /* padding-top: 0.1rem; */
-    border-top: 1px solid #ffffff33;
+    border-top: 1px solid #ffffff22;
     background-color: var(--bg-with-alpha);
 }
 
@@ -133,8 +134,8 @@ body {
     margin-left: -2px;
     padding-bottom: 6rem;
     padding-top: 4.2rem;
-    border-left: solid 1px #ffffff33;
-    border-right: solid 1px #ffffff33;
+    border-left: solid 1px #ffffff22;
+    border-right: solid 1px #ffffff22;
 }
 
 .search_bar {
@@ -150,7 +151,7 @@ body {
     padding: 1rem;
     padding-top: env(titlebar-area-height, 0.5rem);
     padding-bottom: 0.7rem;
-    border-bottom: 1px solid #ffffff33;
+    border-bottom: 1px solid #ffffff22;
 }
 
 .search_bar input[type="text"] {
@@ -165,7 +166,7 @@ body {
     /* background: none; */
     color: #fff;
     font-size: 1rem;
-    /* border: solid 0.1rem #ffffff33; */
+    /* border: solid 0.1rem #ffffff22; */
 }
 
 .search_bar input[type="text"]::placeholder {
@@ -204,7 +205,7 @@ body {
     background-color: var(--bg-with-alpha);
     border-radius: 3rem;
     text-wrap: nowrap;
-    border: solid 1px #ffffff33;
+    border: solid 1px #ffffff22;
     opacity: 0.7;
 }
 
@@ -219,7 +220,7 @@ body {
 }
 
 .page_control_item:hover {
-    background-color: #ffffff33;
+    background-color: #ffffff22;
 }
 
 .page_control img {
@@ -283,14 +284,13 @@ body {
     height: 2rem;
     background-color: var(--bg-with-alpha);
     color: white;
-    border: none;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     justify-content: center;
     align-items: center;
     transition: transform 0.3s;
-    border: solid 1px #ffffff33;
+    border: solid 1px #ffffff22;
     opacity: 0.7;
 }
 
@@ -490,7 +490,7 @@ hr{
 .notice_card{
     padding: 1rem;
     margin: 0.5rem;
-    border: 2px solid #ffffff33;
+    border: 2px solid #ffffff22;
     border-radius: 1rem;
     line-height: 1.2rem;
 }

@@ -3,11 +3,15 @@
     display: inline-block;
     width: 100%;
     min-height: 5rem;
-    margin-bottom: 0.5rem;
+    padding-top: 0.5rem;
     overflow: visible;
     background-color: var(--bg-color);
-    /* border-radius: 0.5rem; */
-    border-bottom: 0.08rem solid #333;
+    border-top: 1px solid #ffffff22;
+    transition: background-color 0.2s;
+}
+
+.card:hover {
+    background-color: #ffffff11;
 }
 
 .card_header {
@@ -33,11 +37,13 @@
     height: 3rem;
     vertical-align: top;
     margin-top: 0.5rem;
+    user-select: text;
 }
 
 .card_header_title {
     line-height: 1.4rem;
     font-size: 0.9rem;
+    /* font-weight: 700; */
     text-wrap: nowrap;
 }
 
@@ -51,16 +57,19 @@
 
 .card_body_text {
     padding: 0.2rem 0.9rem 0.4rem 0.9rem;
+    color: #eee;
     font-size: 0.9rem;
     line-height: 1.2rem;
+    font-weight: lighter;
     max-height: 50vh;
     overflow-y: auto;
+    user-select: text;
 }
 
 .card_media {
     display: inline-block;
     margin: 0rem 0.5rem 0rem 0.5rem;
-    background-color: #000;
+    /* background-color: #030303; */
     width: calc(100% - 1rem);
     height: auto;
     object-fit: contain;
@@ -69,7 +78,8 @@
     border-radius: 0.6rem;
 }
 
-.card_body .card_media {
+.card_body .card_media,
+.card_embed .card_media {
     -webkit-user-drag: auto;
     object-fit: contain;
     max-height: 60vh;
@@ -118,10 +128,9 @@
     top: 0.6rem;
     height: 2rem;
     width: 2rem;
-    background-color: var(--bg-color);
     border-radius: 3rem;
     opacity: 0.7;
-    border: 1px solid #ffffff33;
+    border: 1px solid #ffffff22;
 }
 
 .card_link:hover {
@@ -133,6 +142,10 @@
     margin-top: 0.25rem;
     height: 1.5rem;
     width: 1.5rem;
+}
+
+.float_card .card_link{
+    background-color: var(--bg-with-alpha);
 }
 
 .media_viewer {
@@ -173,25 +186,28 @@
 
 .toggle {
     display: inline-block;
-    border: 0.1rem solid #666;
-    color: #999;
+    border: 1.5px solid #666;
+    color: #ffffff88;
     height: 1.8rem;
     line-height: 1.7rem;
     width: 4rem;
     border-radius: 2rem;
     font-size: 0.8rem;
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+    user-select: none;
 }
 
 .toggle_selected {
-    background-color: #999;
-    border: 0.1rem solid var(--bg-light);
+    background-color: #eee;
+    border: 0.1rem solid #eee;
     color: #000;
 }
 
 .card_embed {
     position: relative;
-    border: 0.08rem solid #333;
-    border-radius: 0.5rem;
+    border: 1px solid #ffffff22;
+    border-radius: 0.7rem;
     margin: 0.4rem;
     overflow: hidden;
 }
@@ -265,7 +281,7 @@
     width: calc(100% - 1rem);
     border-radius: 0.5rem;
     margin: 0.5rem 0 0 0.5rem;
-    border: 2px solid #ffffff33;
+    border: 2px solid #ffffff22;
     padding: 0.2rem;
 }
 

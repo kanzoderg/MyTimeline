@@ -1,8 +1,8 @@
-.user_header_full{
+.user_header_full {
     position: relative;
     /* padding: 0.3rem; */
     margin-bottom: 0.6rem;
-    border-bottom: 1px solid #ffffff33;
+    /* border-bottom: 1px solid #ffffff22; */
 }
 
 .user_header_banner {
@@ -29,10 +29,12 @@
 }
 
 .user_header_title {
+    user-select: all;
     font-size: larger;
 }
 
 .user_header_date {
+    user-select: all;
     font-size: smaller;
     opacity: 0.7;
 }
@@ -45,12 +47,11 @@
     padding: 1rem;
     font-size: 0.9rem;
     max-height: 40vh;
-    /* overflow-x: hidden;
-    overflow-y: auto; */
+    user-select: text;
     overflow: auto;
 }
 
-.user_header_button{
+.user_header_button {
     position: absolute;
     right: 0.5rem;
     top: 0.5rem;
@@ -60,12 +61,12 @@
     background-color: var(--bg-color);
 }
 
-.user_header_button:hover{
+.user_header_button:hover {
     background-color: #33333399 !important;
     opacity: 1;
 }
 
-.user_header_button img{
+.user_header_button img {
     opacity: 0.7;
     margin-left: 0.55rem;
     margin-top: 0.55rem;
@@ -73,7 +74,7 @@
     width: 1.4rem;
 }
 
-.user_header_update_time{
+.user_header_update_time {
     position: absolute;
     top: 0.78rem;
     right: 6.3rem;

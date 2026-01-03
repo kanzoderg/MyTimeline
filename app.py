@@ -38,6 +38,9 @@ parser.add_argument("--update-daemon", action="store_true", help="Regularly upda
 args, unknown = parser.parse_known_args()
 args.debug = bool(args.debug)
 backend.debug_mode = args.debug
+if args.debug:
+    logger.VERBOSE_LEVEL = 1
+    logger.log("Debug mode enabled.", verbose=1)
 args.skip_scan = bool(args.skip_scan)
 
 # temporarily enable debug mode
@@ -57,7 +60,7 @@ def set_csp_header(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:;"
     )
-    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers["Referrer-Policy"] = "no-referrer"
     return response
 
 
@@ -74,7 +77,6 @@ def _js(fn):
 
 @app.route(posixpath.join("/", config.url_base, "css", "<fn>"))
 def _css(fn):
-    print(posixpath.join("/", config.url_base, "css", fn))
     return set_cache_header(send_from_directory("css", fn))
 
 
@@ -85,7 +87,7 @@ def _img(fn):
 
 @app.route(posixpath.join("/", config.url_base, "avatar", "<type>", "<name>"))
 def _avatar(type, name):
-    # print(type, name)
+    # logger.log(type, name)
     name = name.lower()
     if not type or type == "None":
         return send_file("img/default_avatar.png", mimetype="image/jpeg")
@@ -108,14 +110,36 @@ def _avatar(type, name):
                     with open(fn, "wb") as f2:
                         f2.write(f.read())
         else:
-            logger.log("Downloading avatar:", avatar_url)
+            logger.log("Downloading avatar:", avatar_url, type="attention")
             r = requests.get(avatar_url, headers=utils.headers)
             if r.status_code == 200:
                 with open(fn, "wb") as f:
                     f.write(r.content)
+            else:
+                logger.log(
+                    f"Failed to download avatar for {name} from {avatar_url}, status code: {r.status_code}",
+                    type="error",
+                )
+                # Use backup if exists
+                if os.path.exists(fn_bck):
+                    logger.log("copying", fn_bck, "to", fn)
+                    with open(fn_bck, "rb") as f:
+                        with open(fn, "wb") as f2:
+                            f2.write(f.read())
+                else:
+                    # copy default avatar
+                    logger.log(f"Copying default avatar to {fn}", type="attention")
+                    if type == "reddit":
+                        with open("img/reddit.png", "rb") as f:
+                            with open(fn, "wb") as f2:
+                                f2.write(f.read())
+                    else:
+                        with open("img/default_avatar.png", "rb") as f:
+                            with open(fn, "wb") as f2:
+                                f2.write(f.read())
     # Check file size
     if not os.path.exists(fn) or os.path.getsize(fn) < 100:
-        logger.log(f"Avatar file {fn} is too small or does not exist.")
+        logger.log(f"Avatar file {fn} is too small or does not exist.", verbose=1)
         if os.path.exists(fn_bck):
             return set_cache_header(send_file(fn_bck, mimetype="image/jpeg"))
         else:
@@ -132,7 +156,7 @@ def _avatar(type, name):
 
 @app.route(posixpath.join("/", config.url_base, "banner", "<type>", "<name>"))
 def _banner(type, name):
-    # print(type, name)
+    # logger.log(type, name)
     if not type or type == "None":
         return send_file("img/default_avatar.png", mimetype="image/jpeg")
     fn = f"{config.fs_bases[type]}/{name}/banner"
@@ -150,14 +174,31 @@ def _banner(type, name):
                     with open(fn, "wb") as f2:
                         f2.write(f.read())
         else:
-            logger.log("Downloading banner:", banner_url)
+            logger.log("Downloading banner:", banner_url, type="attention")
             r = requests.get(banner_url, headers=utils.headers)
             if r.status_code == 200:
                 with open(fn, "wb") as f:
                     f.write(r.content)
+            else:
+                logger.log(
+                    f"Failed to download banner for {name} from {banner_url}. Status code: {r.status_code}",
+                    type="error",
+                )
+                # Use backup if exists
+                if os.path.exists(fn_bck):
+                    logger.log("copying", fn_bck, "to", fn)
+                    with open(fn_bck, "rb") as f:
+                        with open(fn, "wb") as f2:
+                            f2.write(f.read())
+                else:
+                    # copy default banner
+                    logger.log(f"Copying default banner to {fn}", type="attention")
+                    with open("img/empty.png", "rb") as f:
+                        with open(fn, "wb") as f2:
+                            f2.write(f.read())
     # Check file size
     if not os.path.exists(fn) or os.path.getsize(fn) < 100:
-        logger.log(f"Banner file {fn} is too small or does not exist.")
+        logger.log(f"Banner file {fn} is too small or does not exist.", verbose=1)
         if os.path.exists(fn_bck):
             return set_cache_header(send_file(fn_bck, mimetype="image/jpeg"))
         else:
@@ -370,7 +411,7 @@ def _timeline_fav():
                 continue
             post = backend.Post(post_id, None, None)
             if not post.load_from_db(db):
-                print(f"Post [{post_id}] not found.")
+                logger.log(f"Post [{post_id}] not found.")
                 post.user_name = "None"
                 post.text_content = (
                     f"This post is missing from file system. [{post_id}]"
@@ -421,7 +462,7 @@ def _timeline_fav():
                 continue
             post = backend.Post(post_id, None, None)
             if not post.load_from_db(db):
-                print(f"Post [{post_id}] not found.")
+                logger.log(f"Post [{post_id}] not found.")
                 continue
             for row in db.query_rows(selected_db="media", key="post_id", value=post_id):
                 media_id = row[0]
@@ -581,13 +622,13 @@ def _add_fav():
     if db.query_rows(
         selected_db="fav", key="post_id", value=post_id, ignore_cache=True
     ):
-        print("remove favorite", post_id)
+        logger.log("remove favorite", post_id)
         backend.remove_favorite(db, post_id)
         return {
             "result": "removed",
         }
     else:
-        print("add favorite", post_id)
+        logger.log("add favorite", post_id)
         backend.add_favorite(db, post_id)
         return {
             "result": "added",
@@ -632,8 +673,8 @@ def _ruffle(type, name, filename):
 @app.route(posixpath.join("/", config.url_base, "download"))
 def _download():
     url = ""
-    # print('-'*10,request.args)
-    # print('+'*10,"url" in request.args)
+    # logger.log('-'*10,request.args)
+    # logger.log('+'*10,"url" in request.args)
     if "url" in request.args:
         url = request.args["url"]
     download = render_template(
@@ -657,7 +698,7 @@ def _download():
 @app.route(posixpath.join("/", config.url_base, "file", "<type>", "<name>", "<fn>"))
 def _file(type, name, fn):
     fn = unquote(fn)
-    # print(f"Requesting file: {type}/{name}/{fn}")
+    # logger.log(f"Requesting file: {type}/{name}/{fn}")
     return set_cache_header(send_from_directory(config.fs_bases[type], f"{name}/{fn}"))
 
 
@@ -671,7 +712,7 @@ def _thumb(type, name, fn):
     path = f"{config.fs_bases[type]}/{name}/{fn}"
     thumbnail_path = utils.create_thumbnail(path, size)
     if not thumbnail_path or not os.path.exists(thumbnail_path):
-        print(f"Thumbnail not found for {path}.")
+        logger.log(f"Thumbnail not found for {path}.")
         return set_cache_header(send_file("img/error.jpg", mimetype="image/jpeg"))
     return set_cache_header(send_file(thumbnail_path, mimetype="image/jpeg"))
 
@@ -691,7 +732,7 @@ def _view(type, name, fn):
 @app.route(posixpath.join("/", config.url_base, "add"), methods=["POST"])
 def _add_download_job():
     data = request.get_json()
-    # print("Received data:", data)
+    # logger.log("Received data:", data)
     if "url" in data and data["url"]:
         url = data["url"]
         if "?" in url:
@@ -706,13 +747,13 @@ def _add_download_job():
             or "furaffinity" in url
         ):
             msg = f"Invalid URL: {url}\n"
-            print(msg)
+            logger.log(msg)
             return jsonify(
                 {"msg": msg, "current": utils.current_url, "queue": utils.download_jobs}
             )
         if "did:" in url:
             msg = f"Go get the actual bsky handle like 'xxx.bsky.social', {url} won't do.\n"
-            print(msg)
+            logger.log(msg)
             return jsonify(
                 {"msg": msg, "current": utils.current_url, "queue": utils.download_jobs}
             )
@@ -735,7 +776,7 @@ def _add_download_job():
             msg = f"Added {url} to download queue.\n"
         else:
             msg = f"{url} already in download queue.\n"
-        print(msg)
+        logger.log(msg)
     else:
         msg = "Enter your url above.\n"
     return jsonify(
@@ -753,7 +794,7 @@ def _shorts():
     query = request.args.get("q", "")
     if user_name:
         if not uid in backend.cache_user_media_id:
-            print(f"cache miss for {user_name}, building cache...")
+            logger.log(f"cache miss for {user_name}, building cache...")
             # Need to find media for this user across all sources
             media_ids = db.raw_query(
                 f"SELECT media_id, time, file_name FROM media WHERE uid = '{user_name}@{type}'"
@@ -815,7 +856,7 @@ def _get_a_vid():
     if user_name:
         # get a media_id from user by order
         if not uid in backend.cache_user_media_id:
-            print(f"cache miss for {user_name}, building cache...")
+            logger.log(f"cache miss for {user_name}, building cache...")
             # Need to find the uid for this user - try to get type from most recent media
             media_rows = db.raw_query(
                 f"SELECT media_id, time, file_name, type FROM media WHERE uid = '{uid}'"
@@ -839,7 +880,7 @@ def _get_a_vid():
                 }
             backend.cache_user_media_id[uid] = media_ids
         else:
-            print(f"cache hit for {uid}")
+            logger.log(f"cache hit for {uid}")
             media_ids = backend.cache_user_media_id[uid]
         idx = idx % len(media_ids)
         media_id = media_ids[idx]
@@ -897,7 +938,7 @@ def _api_favs():
         fav_time = time.mktime(time.strptime(fav_time, "%a %b %d %H:%M:%S %Y"))
         post = backend.Post(post_id, None, None)
         if not post.load_from_db(db):
-            print(f"Post [{post_id}] not found.")
+            logger.log(f"Post [{post_id}] not found.")
             continue
         for row in db.query_rows(selected_db="media", key="post_id", value=post_id):
             media_id = row[0]
@@ -914,24 +955,32 @@ def _api_favs():
     return jsonify(fav_files)
 
 
+@app.route(posixpath.join("/", config.url_base, "logs"))
+def _logs():
+    log_lines = logger.get_recent_logs(200)
+    return render_template("logs.html", log_lines=log_lines, url_base=config.url_base)
+
+
 @app.route(posixpath.join("/", config.url_base, "cache_proxy", "<path:subpath>"))
 def cache_proxy(subpath):
-    print(f"Proxying request for: {subpath}")
+    logger.log(f"Proxying request for: {subpath}", type="attention")
+    if not "furaffinity.net" in subpath:
+        logger.log(f"Access to {subpath} denied, be careful, someone is trying to access unauthorized domain, which means someone might be attempting a security breach.", type="error")
+        return "Not allowed.", 400
     subpath.lstrip("/")
     subpath = "https://" + subpath
     filename = subpath.split("/")[-1]
     cache_path = os.path.join("tmp/.cached", filename)
     if os.path.exists(cache_path):
-        if args.debug:
-            print(f"Serving from cache: {cache_path}")
+        logger.log(f"Serving from cache: {cache_path}", verbose=1)
         return set_cache_header(send_file(cache_path))
     else:
         os.makedirs("tmp/.cached", exist_ok=True)
-        print(f"Fetching from remote: {subpath}")
+        logger.log(f"Fetching from remote: {subpath}")
         r = requests.get(subpath, headers=utils.headers)
         with open(cache_path, "wb") as f:
             f.write(r.content)
-        print(f"Cached to: {cache_path}")
+        logger.log(f"Cached to: {cache_path}")
         return set_cache_header(send_file(cache_path))
 
 
@@ -940,15 +989,15 @@ def build_cache_all_posts_id_thread(db):
         try:
             if utils.has_new_download:
                 utils.busy_flag = True
-                print("Building cache...")
+                logger.log("Building cache...")
                 backend.build_cache(db)
-                print("Cache built.")
+                logger.log("Cache built.")
                 utils.has_new_download = False
                 utils.busy_flag = False
             else:
-                print("No new download, skipping cache build.")
+                logger.log("No new download, skipping cache build.")
         except Exception as e:
-            print(e)
+            logger.log(e, type="error")
             utils.busy_flag = False
         # Sleep for a while to avoid busy looping
         time.sleep(30 * 60)
@@ -970,13 +1019,13 @@ def init(db, skip_scan):
         # backend.scan_for_posts("fa", db)
         # backend.scan_for_media("fa", db)
     db.commit()
-    print("Scan finished.")
+    logger.log("Scan finished.")
 
     Thread(target=build_cache_all_posts_id_thread, args=(db,), daemon=True).start()
-    print("Cache building thread started.")
+    logger.log("Cache building thread started.")
 
     if args.update_daemon:
-        print("Starting update daemon...")
+        logger.log("Starting update daemon...")
         Thread(target=utils.update_daemon, daemon=True).start()
 
 
@@ -1001,12 +1050,12 @@ utils.global_running_flag = True
 worker = utils.DownloadWorker(db)
 worker.setDaemon(True)
 worker.start()
-print("Download worker started.")
-print("Ready.")
+logger.log("Download worker started.")
+logger.log("Ready.")
 
 if __name__ == "__main__":
     init(db, args.skip_scan)
-    print(f"app is ready at: http://{config.host}:{config.port}/{config.url_base}")
+    logger.log(f"app is ready at: http://{config.host}:{config.port}/{config.url_base}")
     app.run(host=config.host, port=config.port, debug=args.debug)
     shutdown_cleanup()
 else:
