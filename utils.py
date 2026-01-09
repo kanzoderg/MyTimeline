@@ -1,5 +1,6 @@
 from PIL import Image
 import time, os, re, sys
+import traceback
 import subprocess
 import signal
 from hashlib import md5
@@ -34,6 +35,11 @@ config.fs_bases["bsky"] = os.path.expanduser(config.fs_bases["bsky"])
 config.fs_bases["reddit"] = os.path.expanduser(config.fs_bases["reddit"])
 config.fs_bases["fa"] = os.path.expanduser(config.fs_bases["fa"])
 config.cache_path = os.path.expanduser(config.cache_path)
+
+# create base directories if not exist
+for base_path in config.fs_bases.values():
+    if not os.path.exists(base_path):
+        os.makedirs(base_path)
 
 config.url_base = config.url_base.strip("/")
 if config.url_base:
@@ -252,11 +258,11 @@ class DownloadWorker(Thread):
                     busy_flag = False
                 except Exception as e:
                     busy_flag = False
-                    logger.log(e, type="error")
+                    logger.log(traceback.format_exc(), type="error")
                     logger.log("Scan Failed.", type="error")
                 current_url = ""
             except Exception as e:
-                logger.log("Error in download worker:", e, type="error")
+                logger.log("Error in download worker:", traceback.format_exc(), type="error")
                 time.sleep(1)
 
 
@@ -275,7 +281,7 @@ def update_daemon():
             logger.log(f"[update daemon] Added {url} to queue.")
             time.sleep(10)
     except Exception as e:
-        logger.log("[update daemon]", e, type="error")
+        logger.log("[update daemon]", traceback.format_exc(), type="error")
         time.sleep(10)
 
 
@@ -401,5 +407,5 @@ def get_reddit_about(subreddit_name):
             )
             return {}
     except Exception as e:
-        logger.log(f"Error fetching subreddit info: {e}", type="error")
+        logger.log(f"Error fetching subreddit info: {traceback.format_exc()}", type="error")
         return {}

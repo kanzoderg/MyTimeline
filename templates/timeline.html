@@ -46,6 +46,7 @@
 {% endif %}
 
 {% for post_id in sorted_posts_id %}
+{% if not posts[post_id].isplaceholder %}
 <div class="card" id="p{{post_id}}">
     <div class="card_header">
         <a href="{{url_base}}/user/{{posts[post_id].type}}/{{posts[post_id].user_name}}">
@@ -223,6 +224,19 @@
     <a href="{{posts[post_id].url}}" class="card_link" target="_blank">
         <img src="{{url_base}}/img/link.svg" />
     </a>
+    {% if posts[post_id].reply_to and section != "fav" %}
+    <img src="{{url_base}}/img/tape.png" class="reply_to_deco"></img>
+    {% endif %}
 </div>
+{% else %}
+<div class="card placeholder_card">
+    <div class="card_embed">
+        <a class="card_embed_url" href="{{posts[post_id].url}}" target="_blank">
+            <img class="card_embed_img"
+                src="{{url_base}}/img/external.svg" />
+        </a>
+    </div>
+</div>
+{% endif %}
 {% endfor %}
 <script src="{{url_base}}/js/noreferer.js"></script>

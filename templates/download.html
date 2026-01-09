@@ -1,10 +1,12 @@
 <div class="search_bar">
-    <input type="text" name="q" placeholder="url" id="url_input" onkeydown="execute_on_enter(event,()=>{add_url(true)})" />
+    <input type="text" name="q" placeholder="url" id="url_input"
+        onkeydown="execute_on_enter(event,()=>{add_url(true)})" />
     <img src="{{url_base}}/img/right.svg" onclick="add_url(true)" />
 </div>
 <div class="search_checkboxes">
     <input type="checkbox" id="full" name="full" value="full" style="border-radius: 1rem;">
-    <label for="full">full <span style="font-size: 0.6rem; color: #aaa;">(don't stop even when exsisting posts encoutered)</span></label>
+    <label for="full">full <span style="font-size: 0.6rem; color: #aaa;">(don't stop even when exsisting posts
+            encoutered)</span></label>
     <br>
     <input type="checkbox" id="media_only" name="media_only" value="media_only">
     <label for="media_only">media only</label>
@@ -14,9 +16,10 @@
 </div>
 <div class="current" id="current">
 </div>
+<div class="interrupt_btn" onclick="interrupt_download()">Interrupt Download</div>
 <div class="queue" id="queue">
 </div>
-<a target="_blank" href="{{url_base}}/logs">View Logs</a>
+<a target="_blank" href="{{url_base}}/logs" class="view_logs">View Logs</a>
 
 <script>
     function add_url(add_flag) {
@@ -39,7 +42,7 @@
             .then(data => {
                 if (add_flag) document.getElementById('url_input').value = '';
                 document.getElementById('msg').innerHTML = data['msg'];
-                if(data['current'])
+                if (data['current'])
                     document.getElementById('current').innerHTML = data['current'];
                 else
                     document.getElementById('current').innerHTML = 'Idle';
@@ -49,6 +52,15 @@
                 data['queue'].forEach(function (item, index) {
                     document.getElementById('queue').innerHTML += '<div class=\'job\'>' + item[0] + '</div>';
                 });
+            })
+    }
+
+    function interrupt_download() {
+        fetch('{{url_base}}/api/interrupt', {
+            method: 'GET',
+        }).then(response => response.json())
+            .then(data => {
+                document.getElementById('msg').innerHTML = 'Interrupting download...';
             })
     }
 

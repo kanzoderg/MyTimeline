@@ -40,6 +40,7 @@ def get(url):
 
 
 exsisting_items = set()
+user_info = {}
 
 
 def scan_existing_items(user):
@@ -62,9 +63,12 @@ def scan_existing_items(user):
     print(exsisting_items)
 
 
-def put_user_info(user):
+def put_user_info(user, no_overwrite=False):
+    global user_info
     user_info_file = os.path.join(args.output, user, "user.json")
-    if os.path.exists(user_info_file):
+    if user_info:
+        return
+    if no_overwrite and os.path.exists(user_info_file):
         return
     url = f"https://www.furaffinity.net/user/{user}/"
     resp = get(url)
@@ -80,13 +84,9 @@ def put_user_info(user):
     with open("debug_user.html", "w", encoding="utf-8") as f:
         f.write(resp.text)
     description = soup.find(class_="userpage-profile").decode_contents()
-    try:
-        user_profile = soup.find(
-            class_="userpage-layout-right-col-content"
-        ).decode_contents()
-    except Exception as e:
-        print(f"Failed to parse user profile for {user}: {e}")
-        user_profile = ""
+    user_profile = soup.find(
+        class_="userpage-layout-right-col-content"
+    ).decode_contents()
     user_info = {
         "username": user,
         "display_name": display_name,
@@ -99,6 +99,7 @@ def put_user_info(user):
     os.makedirs(os.path.join(args.output, user), exist_ok=True)
     with open(user_info_file, "w", encoding="utf-8") as f:
         json.dump(user_info, f)
+    print(f"Saved user info for {user}")
 
 
 class Item:

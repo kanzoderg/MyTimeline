@@ -50,6 +50,7 @@ class Database:
             comments INTEGER,
             embed TEXT,
             isreply BOOLEAN,
+            reply_to TEXT,
             real_user TEXT
         )"""
         )
@@ -126,12 +127,13 @@ class Database:
         comments,
         embed,
         isreply,
+        reply_to="",
         real_user="",
     ):
         with self.db_lock:
             cursor = self.conn.cursor()
             cursor.execute(
-                "INSERT OR REPLACE INTO posts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO posts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     post_id,
                     text_content,
@@ -145,6 +147,7 @@ class Database:
                     comments,
                     embed,
                     isreply,
+                    reply_to,
                     real_user,
                 ),
             )
@@ -192,7 +195,7 @@ class Database:
             query_cache = dict()
         if sql in query_cache and not ignore_cache:
             if debug_mode:
-                logger.log("Use cached raw query for", sql, verbose=1)
+                logger.log("Use cached raw query for", sql, verbose=2)
             return query_cache[sql]
         else:
             with self.db_lock:
@@ -330,6 +333,8 @@ class Post:
         self.fav = False
         self.embed = ""
         self.isreply = False
+        self.is_externalreply = False
+        self.reply_to = ""
         if type == "reddit":
             self.real_user = "[deleted]"
         else:
@@ -357,7 +362,8 @@ class Post:
         self.comments = row[9]
         self.embed = row[10]
         self.isreply = row[11]
-        self.real_user = row[12]
+        self.reply_to = row[12]
+        self.real_user = row[13]
         self.text_content = utils.embed_hyperlink(self.type, row[1])
         # check if post is in fav
         rows = db.query_rows("fav", "post_id", self.post_id, True)
@@ -379,6 +385,7 @@ class Post:
             self.comments,
             self.embed,
             self.isreply,
+            self.reply_to,
             self.real_user,
         )
 
@@ -396,6 +403,10 @@ class Post:
             self.comments = json["reply_count"]
 
             self.isreply = "reply_to" in json
+            reply_id = json.get("reply_id", "")
+            reply_to_user = json.get("reply_to", "")
+            if reply_id and reply_to_user:
+                self.reply_to = f"{reply_id}@{reply_to_user.lower()}"
         elif self.type == "bsky":
             self.post_id = str(json["post_id"])
             self.text_content = json["text"]
@@ -415,6 +426,13 @@ class Post:
                 except:
                     self.embed = json["embed"]["record"]["record"]["uri"]
             self.isreply = "reply" in json
+            reply_parent = json.get("reply", {}).get("parent", {})
+            if reply_parent:
+                print("*"*1000,"reply parent:", reply_parent)
+                reply_match = re.match(r"at://([^/]+)/app.bsky.feed.post/([^/]+)$", reply_parent.get("uri", ""))
+                if reply_match:
+                    self.reply_to = f"{reply_match.group(2)}@{reply_match.group(1)}"
+
         elif self.type == "reddit":
             self.post_id = json["id"]
             self.text_content = (
@@ -468,13 +486,24 @@ class Post:
             embed = Embed(embed_post_id, embed_udid, self.type)
             embed.load_from_db(db)
             self.embed_obj = embed
+    
+    def concat_url(self):
+        if self.type == "x":
+            self.url = f"https://x.com/{self.user_name}/status/{self.post_id}"
+        elif self.type == "bsky":
+            self.url = f"https://bsky.app/profile/{self.user_name}/post/{self.post_id}"
+        elif self.type == "reddit":
+            self.url = f"https://reddit.com/r/{self.user_name}/comments/{self.post_id}"
+        elif self.type == "fa":
+            self.url = f"https://www.furaffinity.net/view/{self.post_id}/"
 
 
 class User:
     def __init__(self, user_name, type=""):
+        self.placeholder = False
         if not user_name:
-            raise ValueError("user_name cannot be empty")
-        self.user_name = user_name.lower()
+            self.placeholder = True
+        self.user_name = user_name.lower() if user_name else ""
         self.type = type
         self.uid = f"{self.user_name}@{self.type}" if type else None
         self.nick = ""
@@ -487,6 +516,8 @@ class User:
         self.url = ""
 
     def load_from_db(self, db, ignore_cache=False):
+        if self.placeholder:
+            return False
         # Query by uid if we have type, otherwise query by user_name
         if self.type:
             rows = db.query_rows("users", "uid", self.uid, ignore_cache)
@@ -545,6 +576,8 @@ class User:
             self.nick = self.user_name
 
     def save_to_db(self, db):
+        if self.placeholder:
+            return
         db.insert_or_update_user(
             self.uid,
             self.user_name,
@@ -559,6 +592,8 @@ class User:
         )
 
     def load_from_json(self, json, db, use_fs_modified_time=False):
+        if self.placeholder:
+            return
         if self.type == "x":
             self.nick = json["author"]["nick"]
             self.udid = self.user_name
@@ -570,14 +605,14 @@ class User:
             except:
                 logger.log(
                     f"warning: user {self.user_name} has no banner.\ndownload again with lasest gallery-dl version to fix this.",
-                    type="error",
+                    type="warning",
                 )
             try:
                 self.description = json["author"]["description"]
             except:
                 logger.log(
                     f"warning: user {self.user_name} has nodescription.\ndownload again with lasest gallery-dl version to fix this.",
-                    type="error",
+                    type="warning",
                 )
         elif self.type == "bsky":
             self.nick = json["author"]["displayName"]
@@ -759,7 +794,7 @@ def scan_for_users(type, db, user_name=None):
                 elif type in ["x", "bsky", "reddit"]:
                     file_list = os.listdir(os.path.join(fs_base, user_name))
                     json_files = [f for f in file_list if f.endswith(".json")]
-                    json_files.sort(reverse=True)
+                    json_files = natsort.natsorted(json_files, reverse=True)
                 if len(json_files) > 0:
                     logger.log(f"found user json file: {json_files[0]}")
                     with open(

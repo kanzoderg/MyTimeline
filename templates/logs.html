@@ -3,6 +3,7 @@
 
 <head>
     <title>Logs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <style>
         body {
             font-family: monospace;
@@ -10,9 +11,14 @@
             padding: 20px;
         }
 
+        .logs {
+            padding-bottom: 4rem;
+        }
+
         .log-entry {
             /* margin-bottom: 5px; */
             border-bottom: 1px solid #ccc;
+            line-height: 1.5rem;
         }
 
         #live {
@@ -27,9 +33,15 @@
         .info {
             color: #000;
         }
+
+        .warning {
+            color: orange;
+        }
+
         .error {
             color: red;
         }
+
         .attention {
             color: blue;
         }
@@ -37,9 +49,11 @@
 </head>
 
 <body>
-    {% for line in log_lines %}
-    <div class="log-entry {{ line[0] }}">{{ line[1] }}</div>
-    {% endfor %}
+    <div class="logs">
+        {% for line in log_lines %}
+        <div class="log-entry {{ line[0] }}">{{ line[1] }}</div>
+        {% endfor %}
+    </div>
     <div id="live">
         <input type="radio" id="live_update" name="live_update" onclick="toggle_live()">
         <label for="live_update">Live Update</label>
@@ -55,7 +69,7 @@
         if (live) {
             setInterval(() => {
                 location.reload();
-            }, 2000);
+            }, 4000);
         }
         else {
             setTimeout(() => {

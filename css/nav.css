@@ -250,6 +250,7 @@ body {
 }
 
 .current {
+    user-select: all;
     max-width: calc(100% - 6rem);
     margin-left: 3rem;
     background: linear-gradient(to right, rgb(5, 69, 207), rgb(59, 166, 220));
@@ -257,18 +258,19 @@ body {
     animation: shiftingGradient 10s ease infinite;
     border-radius: 0.5rem;
     padding: 0.6rem;
-    margin-bottom: 2rem;
+    margin-top: 2rem;
     overflow: auto;
     transition: width height 0.5s ease-in-out;
 }
 
 .job {
+    user-select: all;
     width: calc(100% - 6rem);
     margin-left: 3rem;
     background-color: #333;
     border-radius: 0.5rem;
     padding: 0.6rem;
-    margin-bottom: 1rem;
+    margin-top: 1rem;
     overflow: auto;
 }
 
@@ -493,4 +495,33 @@ hr{
     border: 2px solid #ffffff22;
     border-radius: 1rem;
     line-height: 1.2rem;
+}
+
+.view_logs{
+    position: fixed;
+    bottom: 6.5rem;
+    right: 1rem;
+    background-color: var(--bg-with-alpha);
+    color: white;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+    border: solid 1px #ffffff22;
+    opacity: 0.7;
+}
+
+.interrupt_btn{
+    display: inline-block;
+    font-size: 0.9rem;
+    margin-left: 3rem;
+    margin-top: 0.2rem;
+    margin-bottom: 1rem;
+    border: 2px solid #ffffff22;
+    border-radius: 1rem;
+    padding: 0.5rem 1rem;
+}
+
+.interrupt_btn:hover{
+    background-color: #ca2c2c;
+    cursor: pointer;
 }

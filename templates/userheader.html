@@ -1,7 +1,11 @@
 <div class="user_header_full">
-    <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_header_banner" />
+    <a href="{{url_base}}/banner/{{user.type}}/{{user.user_name}}?redownload=1" target="_blank">
+        <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_header_banner" />
+    </a>
     <div class="user_header">
-        <img class="user_header_img" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
+        <a href="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}?redownload=1" target="_blank">
+            <img class="user_header_img" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
+        </a>
         <div class="user_header_txt">
             {% if user.type in ['x', 'bsky'] %}
             <div class="user_header_title">{{user.nick}}</div>
