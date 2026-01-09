@@ -550,6 +550,17 @@ def _timeline(method="tl", type_="", user_name=""):
 
     cnt = 0
     while cnt < len(sorted_posts_id):
+        if len(sorted_posts_id) > config.items_per_page * 5:
+            logger.log(
+                f"Warning: Large number of posts to load: {len(sorted_posts_id)}",
+                type="warning",
+            )
+        if len(sorted_posts_id) > config.items_per_page * 10:
+            logger.log(
+                f"Error: Too many posts to load: {len(sorted_posts_id)}, there might be a loop in replies. Stopping further loading.",
+                type="error",
+            )
+            break
         post_id = sorted_posts_id[cnt]
         cnt += 1
         if post_id in posts:
