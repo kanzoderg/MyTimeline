@@ -317,7 +317,7 @@ def get_posts(method="tl", query="", sort_="new", page=0, user_name="", type_=""
     elif method == "fav":
         sorted_posts_id = backend.get_fav(db)
         all_post_count = len(sorted_posts_id)
-        sorted_posts_id = [i[0] for i in sorted_posts_id if i[0]]
+        sorted_posts_id = [i[0] for i in sorted_posts_id if i[0]][::-1]
         sorted_posts_id = sorted_posts_id[
             page * config.items_per_page : (page + 1) * config.items_per_page
         ][::-1]
@@ -570,7 +570,7 @@ def _timeline(method="tl", type_="", user_name=""):
                 post.isplaceholder = True
                 post.type, post.user_name = external_posts.get(post_id, ("", ""))
                 post.concat_url()
-                print("x" * 100, "guessed url for external post:", post.url)
+                print("guessed url for external post:", post.url)
             elif method == "fav":
                 logger.log(f"Post [{post_id}] not found.")
                 post.user_name = "None"
@@ -622,8 +622,7 @@ def _timeline(method="tl", type_="", user_name=""):
     if method == "user" and user_name not in users:
         users[user_name] = user_obj
 
-    if method != "fav":
-        sorted_posts_id = sorted_posts_id[::-1]
+    sorted_posts_id = sorted_posts_id[::-1]
 
     # Remove duplicates while preserving order
     seen = set()

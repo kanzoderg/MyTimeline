@@ -224,7 +224,7 @@
     <a href="{{posts[post_id].url}}" class="card_link" target="_blank">
         <img src="{{url_base}}/img/link.svg" />
     </a>
-    {% if posts[post_id].reply_to and section != "fav" %}
+    {% if posts[post_id].reply_to %}
     <img src="{{url_base}}/img/tape.png" class="reply_to_deco"></img>
     {% endif %}
 </div>

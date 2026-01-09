@@ -428,7 +428,7 @@ class Post:
             self.isreply = "reply" in json
             reply_parent = json.get("reply", {}).get("parent", {})
             if reply_parent:
-                print("*"*1000,"reply parent:", reply_parent)
+                # print("*"*1000,"reply parent:", reply_parent)
                 reply_match = re.match(r"at://([^/]+)/app.bsky.feed.post/([^/]+)$", reply_parent.get("uri", ""))
                 if reply_match:
                     self.reply_to = f"{reply_match.group(2)}@{reply_match.group(1)}"
