@@ -78,6 +78,19 @@
                 background: #fff
             }
         }
+
+        .drag_area {
+            position: fixed;
+            top: 0;
+            left: 4rem;
+            width: 100%;
+            height: env(titlebar-area-height, 0rem);
+            z-index: 8;
+            -webkit-app-region: drag;
+            /* For WebKit browsers like Chrome */
+            app-region: drag;
+            box-shadow: none;
+        }
     </style>
 </head>
 
@@ -87,6 +100,7 @@
     <div id="loading_icon">
         <div class="loader"></div>
     </div>
+    <div class="drag_area"></div>
     <script>
         // save iframe current location and scroll position before unload
         window.addEventListener('beforeunload', function () {

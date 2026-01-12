@@ -49,6 +49,12 @@ function searchbar_on_enter(e, func) {
         func();
         e.preventDefault();
     }
+    else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.stopPropagation();
+    }
+    else if (e.key === "Escape") {
+        hide_search_history();
+    }
 }
 
 function update_search_q_placeholders() {
@@ -133,7 +139,11 @@ function add_fav(post_id) {
         })
 }
 function scrollToTop() {
-    document.getElementById('container_outer').scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'smooth'
+    });
 }
 
 const float_card = document.getElementById('float_card');
@@ -377,18 +387,22 @@ if (current_q) {
 
 function show_loading_icon() {
     const loading_icon = parent.document.getElementById('loading_icon');
-    loading_icon.style.display = 'block';
+    if (loading_icon) {
+        loading_icon.style.display = 'block';
+    }
 }
 
 function hide_loading_icon() {
     const loading_icon = parent.document.getElementById('loading_icon');
-    loading_icon.style.display = 'none';
+    if (loading_icon) {
+        loading_icon.style.display = 'none';
+    }
 }
-
-hide_loading_icon();
 
 // find all .iconusername and add show_loading_icon on click
 const icon_usernames = document.querySelectorAll('.iconusername');
 icon_usernames.forEach(icon => {
     icon.addEventListener('click', show_loading_icon);
 });
+
+hide_loading_icon();

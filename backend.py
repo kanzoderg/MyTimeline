@@ -224,12 +224,12 @@ class Database:
         )
         if words in self.cached_query_words:
             if abs(self.cached_query_words[words][0] - time.time()) > 1200:
-                logger.log("Clear outdated query cache.")
+                logger.log("Clear outdated query cache.", verbose=1)
                 self.cached_query_words = dict()
             else:
-                logger.log("Use cached query for", words)
+                logger.log("Use cached query for", words, verbose=1)
                 return self.cached_query_words[words][1]
-        logger.log("Querying posts by text:", words)
+        logger.log("Querying posts by text:", words, verbose=1)
         placeholders = " AND ".join(
             ["(text_content || nick || uid || real_user) LIKE ?"] * len(words)
         )
@@ -248,10 +248,10 @@ class Database:
         )
         if words in cache_query_media_id:
             if abs(cache_query_media_id[words][0] - time.time()) > 1200:
-                logger.log("Clear outdated query cache.")
+                logger.log("Clear outdated query cache.", verbose=1)
                 cache_query_media_id = dict()
             else:
-                logger.log("Use cached query for", words)
+                logger.log("Use cached query for", words, verbose=1)
                 return cache_query_media_id[words][1]
         logger.log("Querying media by text:", words)
         placeholders = " AND ".join(

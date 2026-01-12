@@ -445,18 +445,6 @@ body {
     opacity: 0.5;
 }
 
-.drag_area {
-    position: fixed;
-    top: 0;
-    left: 4rem;
-    width: 100%;
-    height: env(titlebar-area-height, 0rem);
-    z-index: 8;
-    -webkit-app-region: drag;
-    /* For WebKit browsers like Chrome */
-    app-region: drag;
-    box-shadow: none;
-}
 
 .bg_blur {
     backdrop-filter: blur(10px);

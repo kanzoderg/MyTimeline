@@ -1,4 +1,9 @@
 <div class="users">
+    {% if users|length == 0 %}
+    <div class="no_user">
+        No users found. <br><i>This is the user list page, go to timeline page to search for posts.</i>
+    </div>
+    {% endif %}
     {% for user in users %}
     <a class="user_card" href="{{url_base}}/user/{{user.type}}/{{user.user_name}}">
         <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_banner"></img>
