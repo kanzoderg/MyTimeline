@@ -1,5 +1,28 @@
 <div class="search_bar" id="search_bar">
-    <input type="text" name="q" placeholder="Search" id="search_bar_input" onkeydown="execute_on_enter(event,search)" />
+    <input type="text" name="q" placeholder="Search" id="search_bar_input" onkeydown="searchbar_on_enter(event,search)" onkeyup="update_search_q_placeholders()"
+        onfocus="show_search_history()" onfocusout="hide_search_history()" autocomplete="off" />
     <img src="{{url_base}}/img/search.svg" onclick="search()" />
 </div>
-<script src="{{url_base}}/js/noreferer.js"></script>
+<div class="search_float" id="search_float">
+    <div class="search_history" id="search_history">
+        <div class="search_history_list" id="search_history_list">
+        </div>
+        <div class="search_history_clear" onclick="clear_search_history()">
+            clear
+        </div>
+    </div>
+    <div class="search_history" id="external_search_suggestions">
+        <a class="external_search_suggestion" onclick="external_search('', 'x')">
+            Search <span class="search_q_placeholder"></span> on <span class="deco_btn"><img class="inline_icon" src="{{url_base}}/img/x.svg"> X</span>
+        </a>
+        <a class="external_search_suggestion" onclick="external_search('', 'reddit')">
+            Search <span class="search_q_placeholder"></span> on <span class="deco_btn"><img class="inline_icon" src="{{url_base}}/img/reddit.svg"> Reddit</span>
+        </a>
+        <a class="external_search_suggestion" onclick="external_search('', 'fa')">
+            Search <span class="search_q_placeholder"></span> on <span class="deco_btn"><img class="inline_icon" src="{{url_base}}/img/fa.svg"> Furaffinity</span>
+        </a>
+        <a class="external_search_suggestion" onclick="external_search('', 'bsky')">
+            Search <span class="search_q_placeholder"></span> on <span class="deco_btn"><img class="inline_icon" src="{{url_base}}/img/bsky.svg"> Bluesky</span>
+        </a>
+    </div>
+</div>

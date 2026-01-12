@@ -11,9 +11,6 @@
     <link rel="stylesheet" href="{{url_base}}/css/userpage.css" />
     <link rel="stylesheet" href="{{url_base}}/css/mediagrid.css" />
     <link rel="manifest" href="{{url_base}}/mt.webmanifest" crossorigin="use-credentials">
-    <meta name="msapplication-TileColor" content="rgb(0,0,0)">
-    <meta name="theme-color" content="rgb(0,0,0)">
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
     <meta name="mobile-web-app-capable" content="yes">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 </head>
@@ -40,12 +37,12 @@
             
             {% if alt_home_icon %}
             <a class="nav_item"
-                href="{{url_base}}/shorts?type={{user.type}}&user={{user.user_name}}">
+                href="{{url_base}}/shorts?type={{user.type}}&user={{user.user_name}}" onclick="show_loading_icon()">
                 <img class="alt_home_icon" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
                 <img src="{{url_base}}/img/video.svg" style="transform: scale(1.1);" />
             </a>
             {% else %}
-            <a class="nav_item" href="{{url_base}}/shorts?q={{current_q}}">
+            <a class="nav_item" href="{{url_base}}/shorts?q={{current_q}}" onclick="show_loading_icon()">
                 <img src="{{url_base}}/img/video.svg" style="transform: scale(1.1);" />
             </a>
             {% endif %}
@@ -88,304 +85,14 @@
     <div class="drag_area"></div>
     <script src="{{url_base}}/js/panzoom.js"></script>
     <script>
-
         var current_page = {{ current_page }};
         var current_q = encodeURIComponent("{{ current_q }}");
         var max_page = {{ max_page }};
         var current_url = "{{current_url|safe}}";
-
-        const search_bar_input = document.getElementById("search_bar_input");
-        const sort_type = document.getElementById("sort_type");
-
-        var float_card_on = false;
-
-        if (current_q) {
-            if(current_url.includes("?"))
-                current_url = current_url + "&q=" + current_q;
-            else
-            {
-                current_url = current_url + "?q=" + current_q;
-            }
-            if (search_bar_input)
-                search_bar_input.value = decodeURIComponent(current_q);
-            if (sort_type) {
-                sort_type.style.display = "none";
-            }
-        }
-
-        function search() {
-            var q = encodeURIComponent(search_bar_input.value)
-            //rip exsiting q
-            if (current_url.includes("?")) {
-                current_url = current_url.split("?")[0];
-            }
-            if (q) {
-                window.location.href = current_url + "?q=" + q;
-            }
-            else {
-                window.location.href = current_url;
-            }
-        }
-
-        function execute_on_enter(e, func) {
-            if (e.key === "Enter") {
-                func();
-                e.preventDefault();
-            }
-        }
-
-        var page_control = document.getElementById("page_control");
-
-        if (max_page <= 1) {
-            page_control.style.display = "none";
-        }
-
-        function next_page() {
-            if (current_page < max_page) {
-                if (current_url.includes("?")) {
-                    window.location.href = current_url + "&p=" + (current_page + 1);
-                } else {
-                    window.location.href = current_url + "?p=" + (current_page + 1);
-                }
-            }
-        }
-
-        function prev_page() {
-            if (current_page > 1) {
-                if (current_url.includes("?")) {
-                    window.location.href = current_url + "&p=" + (current_page - 1);
-                } else {
-                    window.location.href = current_url + "?p=" + (current_page - 1);
-                }
-            }
-        }
-
-        function go_page(num = -1) {
-            if (num != -1) {
-                page_num = num;
-            }
-            else {
-                page_num = prompt("Page number", "");
-            }
-
-            if (isNaN(page_num)) {
-                alert("Please enter a valid number");
-            }
-
-            if (!page_num) {
-                return;
-            }
-
-            page_num = Math.min(Math.max(page_num, 0), max_page)
-            if (current_url.includes("?")) {
-                window.location.href = current_url + "&p=" + page_num;
-            } else {
-                window.location.href = current_url + "?p=" + page_num;
-            }
-        }
-
-        function add_fav(post_id) {
-            fetch('{{url_base}}/add_fav?post_id=' + post_id, {
-                method: 'GET'
-            }).then(response => response.json())
-                .then(data => {
-                    console.log(data);
-                    fav_divs = document.getElementsByClassName("p" + post_id + "_fav")
-                    for (var i = 0; i < fav_divs.length; i++) {
-                        fav_div = fav_divs[i];
-                        if (data['result'] == 'added') {
-                            fav_div.src = "{{url_base}}/img/bookmark.svg";
-                        }
-                        else {
-                            fav_div.src = "{{url_base}}/img/bookmark_empty.svg";
-                        }
-                    }
-                })
-        }
-        function scrollToTop() {
-            document.getElementById('container_outer').scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        const float_card = document.getElementById('float_card');
-
-        var hide_card_timeout = null;
-        function show_card_wth_timeout() {
-            clearTimeout(hide_card_timeout);
-            float_card_card.style.opacity = 1;
-            hide_card_timeout = setTimeout(() => {
-                float_card_card.style.opacity = 0;
-            }, 3000);
-        }
-
-        var enter_fullscreen_debounce = false;
-
-        function show_float_card(e, card_content_url) {
-            enter_fullscreen_debounce = true;
-            fetch(card_content_url)
-                .then(response => response.text())
-                .then(data => {
-                    float_card.innerHTML = data;
-                    float_card.style.display = 'block';
-                    location.hash = "float_card";
-                    init_panzoom();
-                    init_video_controls();
-                    float_card_card = document.querySelector('.float_card .card');
-                    float_card_card.addEventListener('mouseover', () => {
-                        clearTimeout(hide_card_timeout);
-                        float_card_card.style.opacity = 1;
-                    });
-                    float_card_card.addEventListener('mouseleave', () => {
-                        clearTimeout(hide_card_timeout);
-                        hide_card_timeout = setTimeout(() => {
-                            float_card_card.style.opacity = 0;
-                        }, 5000);
-                    });
-                    show_card_wth_timeout();
-                    float_card_on = true;
-                    // requests full screen
-                    // document.body.webkitRequestFullscreen();
-                    setTimeout(() => {
-                        enter_fullscreen_debounce = false;
-                    }, 400);
-                });
-            e.preventDefault();
-        }
-
-        // setInterval(() => {
-        //     //check if is currently in full screen
-        //     if (enter_fullscreen_debounce) {
-        //         return;
-        //     }
-        //     if (!document.webkitIsFullScreen) {
-        //         if (float_card_on) {
-        //             float_card_on = false;
-        //             history.back();
-        //         }
-        //     }
-        // }, 100);
-
-        function locationHashChanged() {
-            if (!location.hash) {
-                float_card.innerHTML = '';
-                float_card.style.display = 'none';
-            }
-        }
-
-        window.onhashchange = locationHashChanged;
-
-        function hide_float_card() {
-            float_card_on = false;
-            // document.exitFullscreen();
-            history.back();
-        }
-
-        function init_panzoom() {
-            float_card_media = document.getElementById('float_card_media');
-            video_seek = document.getElementById('video_seek'); //input
-            if (video_seek) {
-                return;
-            }
-            zoom = Panzoom(float_card_media, {
-                animate: false, maxScale: 8, minScale: 0.05,
-                setTransform: (elem, { scale, x, y }) => {
-                    zoom.setStyle('transform', `scale(${scale}) translate(${x}px, ${y}px) rotate(0deg)`);
-                    zoom.setStyle('transition', 'none');
-                }
-            });
-            float_card_media.addEventListener('wheel', function (e) {
-                deltaY = e.deltaY;
-                if (deltaY > 0) {
-                    zoom.zoomOut();
-                }
-                else {
-                    zoom.zoomIn();
-                }
-            });
-            float_card_media.addEventListener('click', function (e) {
-                show_card_wth_timeout();
-            });
-        }
-
-        function init_video_controls() {
-            console.log("init video controls");
-            video_ = document.getElementById('float_card_media'); //video
-            video_seek = document.getElementById('video_seek'); //input
-            time_current = document.getElementById('time_current'); //current time MM:SS
-            time_total = document.getElementById('time_total'); //total time, MM:SS
-            if (!video_seek) {
-                console.log("no video seek");
-                return;
-            }
-            video_.addEventListener('loadedmetadata', function () {
-                video_seek.max = video_.duration;
-                time_total.innerHTML = new Date(video_.duration * 1000).toISOString().substr(14, 5);
-            });
-            video_.addEventListener('timeupdate', function () {
-                video_seek.value = video_.currentTime;
-                time_current.innerHTML = new Date(video_.currentTime * 1000).toISOString().substr(14, 5);
-            });
-            video_seek.addEventListener('input', function () {
-                video_.currentTime = video_seek.value;
-            });
-            // handle click to pause/play
-            video_.addEventListener('click', function () {
-                // if (video_.paused) {
-                //     video_.play();
-                // } else {
-                //     video_.pause();
-                // }
-                show_card_wth_timeout();
-            });
-            //wheel to seek
-            video_.addEventListener('wheel', function (e) {
-                deltaY = e.deltaY;
-                if (deltaY > 0) {
-                    video_.currentTime += 2;
-                }
-                else {
-                    video_.currentTime -= 2;
-                }
-            });
-        }
-        // capture left and right arrow keys to go to next/prev page
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowLeft') {
-                prev_page();
-            } else if (e.key === 'ArrowRight') {
-                next_page();
-            }
-            else if (e.key === 'Escape') {
-                if (float_card_on) {
-                    float_card_on = false;
-                    history.back();
-                }
-            }
-        })
-
-        function toggle_video_play() {
-            video_ = document.getElementById('float_card_media'); //video
-            pause_btn_img = document.getElementById('pause_btn_img'); //img 
-            if (video_.paused) {
-                video_.play();
-                pause_btn_img.src = "{{url_base}}/img/pause_w.svg";
-                pause_btn_img.style.marginLeft = "0.8rem";
-            } else {
-                video_.pause();
-                pause_btn_img.src = "{{url_base}}/img/play_w.svg";
-                pause_btn_img.style.marginLeft = "0.9rem";
-            }
-        }
-
-        function enter_fullscreen() {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            }
-            else{
-                document.documentElement.requestFullscreen();
-            }
-        }
+        var url_base = "{{url_base}}";
     </script>
     <script src="{{url_base}}/js/noreferer.js"></script>
+    <script src="{{url_base}}/js/nav.js"></script>
 </body>
 
 </html>

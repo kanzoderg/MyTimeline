@@ -9,7 +9,7 @@
         <div class="user_header_txt">
             {% if user.type in ['x', 'bsky'] %}
             <div class="user_header_title">{{user.nick}}</div>
-            <div class="user_header_date">@{{user.user_name}}</div>
+            <div class="user_header_date">@<span style="user-select: all;">{{user.user_name}}</span></div>
             {% elif user.type == 'reddit' %}
             <div class="user_header_title">r/{{user.user_name}}</div>
             {% elif user.type == 'fa' %}

@@ -34,7 +34,6 @@
 }
 
 .user_header_date {
-    user-select: all;
     font-size: smaller;
     opacity: 0.7;
 }

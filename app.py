@@ -72,7 +72,6 @@ def _webmanifest():
 
 
 if config.url_base.strip("/") != "":
-
     @app.route("/")
     def _root():
         return redirect(posixpath.join("/", config.url_base, "tl"))
@@ -220,7 +219,7 @@ def _banner(type, name):
 @app.route(posixpath.join("/", config.url_base + "/"))
 @app.route(posixpath.join("/", config.url_base))
 def _index():
-    return redirect(posixpath.join("/", config.url_base, "tl"))
+    return render_template("frame.html", url_base=config.url_base)
 
 
 @app.route(posixpath.join("/", config.url_base, "userlist"))
@@ -235,12 +234,23 @@ def _userlist():
     else:
         query = ""
     if query:
+        fuzz_query = (
+            query.replace("https://", "")
+            .replace("x.com/", "")
+            .replace("bsky.app/profile/", "")
+            .replace("twitter.com/", "")
+            .replace("www.reddit.com/r/", "")
+            .replace("reddit.com/r/", "")
+            .replace("furaffinity.net/user/", "")
+            .lower()
+        )
         all_users = [
             u
             for u in backend.all_users
-            if query.lower() in u.nick.lower()
-            or query.lower() in u.user_name.lower()
-            or query.lower() in u.description.lower()
+            if fuzz_query in u.nick.lower()
+            or fuzz_query in u.uid.lower()
+            or fuzz_query in u.user_name.lower()
+            or fuzz_query in u.description.lower()
         ]
         users = all_users[
             page * config.items_per_page : (page + 1) * config.items_per_page
@@ -1147,7 +1157,7 @@ def build_cache_all_posts_id_thread(db):
             logger.log(traceback.format_exc(), type="error")
             utils.busy_flag = False
         # Sleep for a while to avoid busy looping
-        time.sleep(30 * 60)
+        time.sleep(60 * 60)
 
 
 def init(db, skip_scan):

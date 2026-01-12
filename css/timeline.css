@@ -74,7 +74,7 @@
     height: auto;
     object-fit: contain;
     overflow: hidden;
-    min-height: 15rem;
+    min-height: 5rem;
     border-radius: 0.6rem;
 }
 

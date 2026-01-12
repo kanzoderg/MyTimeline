@@ -231,7 +231,7 @@ class Database:
                 return self.cached_query_words[words][1]
         logger.log("Querying posts by text:", words)
         placeholders = " AND ".join(
-            ["(text_content || ' ' || nick || real_user) LIKE ?"] * len(words)
+            ["(text_content || nick || uid || real_user) LIKE ?"] * len(words)
         )
         sql_query = f"SELECT post_id, time FROM posts WHERE {placeholders}"
         params = tuple([f"%{word}%" for word in words])

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>{{title}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="{{url_base}}/mt.webmanifest" crossorigin="use-credentials">
+    <meta name="msapplication-TileColor" content="rgb(0,0,0)">
+    <meta name="theme-color" content="rgb(0,0,0)">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <style>
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        iframe {
+            border: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading_icon {
+            position: fixed;
+            display: none;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            font-size: 1.5rem;
+            z-index: 11;
+            user-select: none;
+        }
+
+        .loader {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 15px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            animation: l5 1s infinite linear alternate;
+        }
+
+        @keyframes l5 {
+            0% {
+                box-shadow: 20px 0 #fff, -20px 0 #fff2;
+                background: #fff
+            }
+
+            33% {
+                box-shadow: 20px 0 #fff, -20px 0 #fff2;
+                background: #fff2
+            }
+
+            66% {
+                box-shadow: 20px 0 #fff2, -20px 0 #fff;
+                background: #fff2
+            }
+
+            100% {
+                box-shadow: 20px 0 #fff2, -20px 0 #fff;
+                background: #fff
+            }
+        }
+    </style>
+</head>
+
+
+<body>
+    <iframe src=""></iframe>
+    <div id="loading_icon">
+        <div class="loader"></div>
+    </div>
+    <script>
+        // save iframe current location and scroll position before unload
+        window.addEventListener('beforeunload', function () {
+            const iframe = document.querySelector('iframe');
+            const iframeWindow = iframe.contentWindow;
+            const iframeSrc = iframeWindow.location.href;
+            const scrollPosition = iframeWindow.scrollY || iframeWindow.pageYOffset;
+            localStorage.setItem('mt_iframeSrc', iframeSrc);
+            localStorage.setItem('mt_iframeScrollPosition', scrollPosition);
+            localStorage.setItem('mt_iframeTimestamp', Date.now());
+        });
+
+        // restore iframe src and scroll position on load
+        window.addEventListener('load', function () {
+            const iframe = document.querySelector('iframe');
+            const savedSrc = localStorage.getItem('mt_iframeSrc');
+            const savedScrollPosition = localStorage.getItem('mt_iframeScrollPosition');
+            const savedTimestamp = localStorage.getItem('mt_iframeTimestamp');
+            const now = Date.now();
+            if (savedTimestamp && now - savedTimestamp > 60 * 60 * 1000) {
+                localStorage.removeItem('mt_iframeSrc');
+                localStorage.removeItem('mt_iframeScrollPosition');
+                localStorage.removeItem('mt_iframeTimestamp');
+                iframe.src = "{{url_base}}/tl";
+                return;
+            }
+            if (savedSrc) {
+                iframe.src = savedSrc;
+                iframe.contentWindow.scrollTo(0, parseInt(savedScrollPosition) || 0);
+            } else {
+                iframe.src = "{{url_base}}/tl";
+            }
+        });
+    </script>
+</body>
+
+</html>

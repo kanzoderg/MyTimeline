@@ -8,12 +8,12 @@
 
 <body>
     <video id="video_preload" style="display: none;"></video>
-    <img id="avatar_preload" style="display: none;"/>
+    <img id="avatar_preload" style="display: none;" />
 
     <div class="container">
         <img id="container_bg" style="display: none;"></img>
         <div class="video_container">
-            <video id="video" loop onerror="this.src='{{url_base}}/img/error.webm';this.play();" >
+            <video id="video" loop onerror="this.src='{{url_base}}/img/error.webm';this.play();">
                 <source src="" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
@@ -190,11 +190,11 @@
             setTimeout(() => {
                 // video.style.opacity = 1;
                 avatar.src = video_data.avatar;
-                if( video_data.type == 'reddit' ){
+                if (video_data.type == 'reddit') {
                     author_id.textContent = 'u/' + video_data.author_id;
                     author.textContent = 'r/' + video_data.author;
                 }
-                else{
+                else {
                     author_id.textContent = '@' + video_data.author_id;
                     author.textContent = video_data.author;
                 }
@@ -235,8 +235,8 @@
             if (idx > {{ total_cnt }}) {
                 idx = idx % {{ total_cnt }};
             }
-        {% endif %}
-            full_opacity();
+            {% endif %}
+        full_opacity();
         }
 
         function load_previous() {
@@ -247,11 +247,11 @@
             //get the second last video
             video_data = vid_history[vid_history.length - 3];
             avatar.src = video_data.avatar;
-            if( video_data.type == 'reddit' ){
+            if (video_data.type == 'reddit') {
                 author_id.textContent = 'u/' + video_data.author_id;
                 author.textContent = 'r/' + video_data.author;
             }
-            else{
+            else {
                 author_id.textContent = '@' + video_data.author_id;
                 author.textContent = video_data.author;
             }
@@ -423,11 +423,11 @@
         }
 
         function enter_fullscreen() {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
+            if (parent.document.fullscreenElement) {
+                parent.document.exitFullscreen();
             }
-            else{
-                document.documentElement.requestFullscreen();
+            else {
+                parent.document.documentElement.requestFullscreen();
             }
         }
 
@@ -435,6 +435,13 @@
 
         init_video();
         full_opacity();
+
+        function hide_loading_icon() {
+            const loading_icon = parent.document.getElementById('loading_icon');
+            loading_icon.style.display = 'none';
+        }
+
+        hide_loading_icon();
     </script>
     <script src="{{url_base}}/js/noreferer.js"></script>
 </body>

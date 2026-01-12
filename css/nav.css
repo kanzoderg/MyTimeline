@@ -50,9 +50,10 @@ body {
     color: var(--text-color);
     background-color: var(--bg-color);
     font-family: sans-serif;
-    height: 100vh;
+    /* height: 100vh; */
     text-align: center;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     user-select: none;
 }
 
@@ -117,8 +118,7 @@ body {
 }
 
 .container_outer {
-    position: fixed;
-    height: 100%;
+    height: auto;
     width: 100%;
     overflow-x: hidden;
     overflow-y: auto;
@@ -524,4 +524,90 @@ hr{
 .interrupt_btn:hover{
     background-color: #ca2c2c;
     cursor: pointer;
+}
+
+.search_float{
+    position: fixed;
+    z-index: 10;
+    display: none;
+    width: 100%;
+    height: 100%;
+    top: 3.8rem;
+    left: 0;
+    background-color: #000000dd;
+    padding: 1rem;
+    border-bottom: 1px solid #ffffff22;
+    overflow-y: auto;
+    transition: opacity 0.2s;
+}
+
+.search_history {
+    display: flex;
+    flex-direction: column;
+    padding: 0.3rem 1rem;
+    width: auto;
+    margin-bottom: 0.5rem;
+    border: 1px solid #ffffff22;
+    border-radius: 0.3rem;
+    overflow: hidden;
+}
+
+.search_history_item{
+    display: inline-block;
+    padding: 0.3rem 0.5rem;
+    margin: 0.1rem 0.1rem;
+    border: 1px solid #ffffff22;
+    color: #ffffffbb;
+    border-radius: 0.3rem;
+    cursor: pointer;
+}
+
+.search_history_item:hover{
+    background-color: #ffffff22;
+}
+
+.search_history_clear{
+    float: right;
+    text-align: right;
+    color: #ffffff88;
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.3rem;
+}
+
+.search_history_clear:hover{
+    background-color: #ffffff22;
+    cursor: pointer;
+}
+
+.external_search_suggestion{
+    padding: 0rem 0.5rem;
+    margin: 0.2rem 0;
+    border-radius: 0.2rem;
+    border-left: solid 0.15rem #ffffff44;
+}
+
+.external_search_suggestion:hover{
+    background-color: #ffffff22;
+    cursor: pointer;
+}
+
+.inline_icon{
+    display: inline-flex;
+    width: 1.2rem;
+    height: 1.2rem;
+    vertical-align: middle;
+}
+
+.deco_btn{
+    display: inline-block;
+    font-size: 0.9rem;
+    border: 0.08rem solid #ffffff22;
+    border-radius: 1rem;
+    padding: 0.3rem 0.6rem;
+    vertical-align: middle;
+}
+
+.search_q_placeholder{
+    font-weight: bold;
+    text-decoration: underline;
 }
