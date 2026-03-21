@@ -1,35 +1,65 @@
+<div class="timeline_toggle_bar">
+    {% if section != "fav" %}
+    <select name="sort_type" id="sort_type"
+        onchange="location.href='{{page_url}}?tab=media&sort_type='+this.value{%if q%}+'&q={{q}}'{% endif %};show_loading_icon();"
+        tabindex="-1">
+        <option value="new" {% if sort_type=="new" %}selected{% endif %}>New</option>
+        <option value="top" {% if sort_type=="top" %}selected{% endif %}>Top</option>
+        <option value="random" {% if sort_type=="random" %}selected{% endif %}>Random</option>
+    </select>
+    <img src="{{url_base}}/img/down.svg" class="select_deco">
+    {% endif %}
 
-<div class="media_toggle">
-    <a class="toggle" href="{{page_url}}">Posts</a>
-    <a class="toggle toggle_selected" href="{{page_url}}?tab=media">Media</a>
+    <div class="media_toggle">
+        <a class="toggle"
+            href="{{page_url}}?tab=posts&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Posts</a>
+        <a class="toggle toggle_selected"
+            href="{{page_url}}?tab=media&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Media</a>
+    </div>
 </div>
 <div class="media_grid">
-    {% for media_id in sorted_media_id %}
-    {% if media_entries[media_id].isvideo or media_entries[media_id].isimage %}
-    <div class="media_grid_item" onclick="show_float_card(event,'{{url_base}}/card/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}')">
-        <img src="{{url_base}}/thumb/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}"
-        loading="lazy" />
-        {% if media_entries[media_id].isvideo %}
+    {% set media_cnt = namespace(value=0) %}
+    {% for post_id in sorted_posts_id %}
+    {% set post = posts[post_id] %}
+    {% for media in post.medias %}
+    {% set media_cnt.value = media_cnt.value + 1 %}
+    {% if media.isvideo or media.isimage %}
+    <div class="media_grid_item"
+        onclick="show_float_card(event,'{{url_base}}/fullscreen_card/{{media.type}}/{{media.user_name}}/{{media.file_name}}')">
+        <img src="{{url_base}}/thumb/{{media.type}}/{{media.user_name}}/thumb_{{media.file_name}}" loading="lazy" />
+        {% if media.isvideo %}
         <div class="video_icon">
-            <img src="{{url_base}}/img/play.svg"/>
+            <img src="{{url_base}}/img/play.svg" />
+        </div>
+        {% endif %}
+        {% if media.file_name.endswith('.gif') %}
+        <div class="gif_icon">
+            <img src="{{url_base}}/img/gif.svg" />
         </div>
         {% endif %}
     </div>
-    {% elif media_entries[media_id].isflash %}
-    <a class="media_grid_item" href='{{url_base}}/ruffle/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}'>
-        <img src="{{url_base}}/thumb/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}"
-        loading="lazy" />
+    {% elif media.isflash %}
+    <a class="media_grid_item" href='{{url_base}}/ruffle/{{media.type}}/{{media.user_name}}/{{media.file_name}}'>
+        <img src="{{url_base}}/thumb/{{media.type}}/{{media.user_name}}/{{media.file_name}}" loading="lazy" />
         <div class="video_icon" style="background: none;">
-            <img src="{{url_base}}/img/flash.svg"/>
+            <img src="{{url_base}}/img/flash.svg" />
         </div>
     </a>
-    {% elif media_entries[media_id].isaudio %}
-    <div class="media_grid_item" onclick="show_float_card(event,'{{url_base}}/card/{{media_entries[media_id].type}}/{{media_entries[media_id].user_name}}/{{media_entries[media_id].file_name}}')" style="background-color: #000;">
+    {% elif media.isaudio %}
+    <div class="media_grid_item"
+        onclick="show_float_card(event,'{{url_base}}/fullscreen_card/{{media.type}}/{{media.user_name}}/{{media.file_name}}')"
+        style="background-color: #000;">
         <div class="video_icon" style="background: none;">
-            <img src="{{url_base}}/img/audio.svg"/>
+            <img src="{{url_base}}/img/audio.svg" />
         </div>
     </div>
     {% endif %}
     {% endfor %}
+    {% endfor %}
 </div>
+
+<div class="end_of_media_info">
+    {{ media_cnt.value }} medias in this page.
+</div>
+
 <script src="{{url_base}}/js/noreferer.js"></script>

@@ -1,0 +1,109 @@
+{% if media.isvideo %}
+<video class="full_card_media" id="float_card_media" loop autoplay onload="init_video_controls()" style="margin: 0;">
+    <source src="{{url_base}}/file/{{post.type}}/{{post.user_name}}/{{media.file_name}}" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+{% elif media.isaudio %}
+<video class="full_card_media" id="float_card_media" loop autoplay onload="init_video_controls()"
+    style="margin: 0;transform: scale(0.5);" poster="{{url_base}}/img/audio.svg">
+    <source src="{{url_base}}/file/{{post.type}}/{{post.user_name}}/{{media.file_name}}">
+    Your browser does not support the video tag.
+</video>
+{% else %}
+<img class="full_card_media" id="float_card_media"
+    src="{{url_base}}/file/{{post.type}}/{{post.user_name}}/{{media.file_name}}" style="margin: 0;" />
+{% endif %}
+<div id="float_card_ui">
+    <div class="card translucent" id="p{{post_id}}">
+        {% if media.isvideo or media.isaudio %}
+        <div class="video_controls">
+            <div class="time_label" id="time_current">00:00</div>
+            <input type="range" id="video_seek" value="0" step="0.1" />
+            <div class="time_label" id="time_total">00:00</div>
+        </div>
+        <div id="pause_btn" onclick="toggle_video_play()">
+            <img src="{{url_base}}/img/pause_w.svg" id="pause_btn_img" />
+        </div>
+        {% endif %}
+        <div class="card_header">
+            <a href="{{url_base}}/user/{{post.type}}/{{post.user_name}}">
+                <img class="card_header_img" src="{{url_base}}/avatar/{{post.type}}/{{post.user_name}}" />
+            </a>
+            <div class="header_txt">
+                {% if post.type in ['x', 'bsky'] %}
+                <div class="card_header_title">{{user.nick[:20]}}
+                    <span class="card_header_name">@{{user.user_name}}</span>
+                </div>
+                {% elif post.type == 'reddit' %}
+                <div class="card_header_title">r/{{user.user_name}}
+                    <span class="card_header_name">u/{{post.real_user}}</span>
+                </div>
+                {% elif post.type == 'fa' %}
+                <div class="card_header_title">{{user.nick[:20]}}
+                    <span class="card_header_name">~ {{user.user_name}}</span>
+                </div>
+                {% endif %}
+                <div class="card_header_date">{{post.get_time_str()}}</div>
+            </div>
+        </div>
+        <div class="card_body">
+            <div class="card_body_text" style="height: 4rem; overflow-y: auto;">
+                {{post.text_content | safe}}
+            </div>
+        </div>
+        <div class="card_footer">
+            <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+                <img src="{{url_base}}/img/like.svg" />
+                <span>{{post.likes}}</span>
+            </a>
+            <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+                <img src="{{url_base}}/img/comment.svg" />
+                <span>{{post.comments}}</span>
+            </a>
+            <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+                <img src="{{url_base}}/img/repost.svg" />
+                <span>{{post.reposts}}</span>
+            </a>
+            <a class="card_footer_item" onclick="add_fav('{{post.post_id}}')">
+                {% if post.fav %}
+                <img src="{{url_base}}/img/bookmark.svg" class="p{{post.post_id}}_fav" />
+                {% else %}
+                <img src="{{url_base}}/img/bookmark_empty.svg" class="p{{post.post_id}}_fav" />
+                {% endif %}
+            </a>
+        </div>
+        <a href="{{post.url}}" class="card_link" target="_blank">
+            <img src="{{url_base}}/img/link.svg" />
+        </a>
+    </div>
+    <a onclick="hide_float_card()" class="float_btn translucent" style="top: 1rem; left: 1rem;">
+        <img src="{{url_base}}/img/cross.svg" style="transform: scale(0.8);" />
+    </a>
+    <a onclick="enter_fullscreen()" class="float_btn translucent" style="top: 1rem; right: 1rem;">
+        <img src="{{url_base}}/img/full.svg" style="transform: scale(0.5);" />
+    </a>
+    <a onclick="reset_media_transform()" id="reset_transform_btn" class="float_btn translucent"
+        style="top: 1rem; right: 4rem; display: none;">
+        <img src="{{url_base}}/img/reset.svg" style="transform: scale(0.4);" />
+    </a>
+
+    {% if prev_url %}
+    <a onclick="show_float_card(event,'{{prev_url}}')" data-url="{{prev_url}}" class="float_btn translucent"
+        id="full_card_prev" style=" top: calc(50% - 1rem); left: 1rem;">
+        <img src="{{url_base}}/img/left.svg" style="transform: scale(0.8);" />
+    </a>
+    {% endif %}
+    {% if next_url %}
+    <a onclick="show_float_card(event,'{{next_url}}')" data-url="{{next_url}}" class="float_btn translucent"
+        id="full_card_next" style="top: calc(50% - 1rem); right: 1rem;">
+        <img src="{{url_base}}/img/right.svg" style="transform: scale(0.8);" />
+    </a>
+    {% endif %}
+    {% if alt_text %}
+    <div class="alt_txt_full_btn alt_txt_btn translucent" id="p{{post_id}}_alt{{media_idx}}"
+        onclick="show_alt('p{{post_id}}_alt{{media_idx}}')" data="{{alt_text}}">
+        ALT
+    </div>
+    {% endif %}
+</div>
+<script src="{{url_base}}/js/noreferer.js"></script>

@@ -1,0 +1,30 @@
+{
+    "host": "0.0.0.0",
+    "port": 8088,
+    "url_base": "", 
+    "cookies_list": {
+        "x": "./x.com_cookies.txt", 
+        "bsky": "" 
+    },
+    "auth_files": {
+        "x": "", 
+        "bsky": "./bsky_auth.json" 
+        
+    },
+    "fs_bases": {
+        "x": "./downloads/twitter",
+        "bsky": "./downloads/bluesky",
+        "reddit": "./downloads/reddit",
+        "fa": "./downloads/furaffinity"
+    },
+    "cache_path": "~/.cache/mt",
+    "thumbnail_size": 600,
+    "custom_gallery_dl_location": "", 
+    "items_per_page": 30,
+    "proxy": "", 
+    "no_auth": true, 
+    "user_pin": "1234", 
+    "admin_pin": "1234", 
+    "super_session_key": "", 
+    "log_file": "./log.txt"
+}

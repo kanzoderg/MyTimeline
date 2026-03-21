@@ -1,0 +1,16 @@
+{% if sorted_posts|length > 0 %}
+<img src="{{url_base}}/banner/{{sorted_posts[0].type}}/{{sorted_posts[0].user_name}}" id="background_banner" />
+{% endif %}
+
+{% if not post_found %}
+<div class="no_result">
+    This post is not in database...<br>
+    Click the button below to try to go to the original post<br>
+    <a class="toggle toggle_selected" href="{{sorted_posts[0].url}}" target="_blank">Original Post</a>
+</div>
+{% else %}
+{% for post in sorted_posts %}
+{% set user = users[post.user_name] %}
+{% include 'card.html' %}
+{% endfor %}
+{% endif %}

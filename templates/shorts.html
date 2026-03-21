@@ -27,7 +27,7 @@
                     <div id="author"></div>
                     <div id="author_id"></div>
                     <br>
-                    <div id="time"></div>
+                    <div id="date"></div>
                 </div>
             </a>
             <div id="description"></div>
@@ -83,10 +83,12 @@
             </a>
 
             <div class="video_controls" id="video_controls">
-                <div class="time_label" id="time_current">00:00</div>
+                <div id="time_current">00:00</div>
                 <input type="range" id="video_seek" value="0" />
-                <div class="time_label" id="time_total">00:00</div>
+                <div id="time_total">00:00</div>
             </div>
+
+            <div id="preview_loading" class="loader"></div>
         </div>
     </div>
     <script>
@@ -96,7 +98,7 @@
         avatar = document.querySelector('#avatar');
         author = document.querySelector('#author');
         author_id = document.querySelector('#author_id');
-        time_label = document.querySelector('#time');
+        date_label = document.querySelector('#date');
         description = document.querySelector('#description');
         video_container = document.querySelector('.video_container');
         video = document.querySelector('#video');
@@ -109,7 +111,12 @@
         fav_img = document.querySelector('#fav_img');
         user_link = document.querySelector('#user_link');
 
+        preview_loading = document.querySelector('#preview_loading');
+
+        allow_next = true;
+
         idx = {{ current_cnt }};
+        total_cnt = {{ total_cnt if total_cnt else 0 }};
 
         video_container.addEventListener('click', function () {
             if (video.paused) {
@@ -148,7 +155,7 @@
             video.style.transition = 'transform 0.3s';
             next_preview.style.transition = 'transform 0.3s, opacity 0.3s';
 
-            if (deltaY / window.innerHeight < -0.1) {
+            if (deltaY / window.innerHeight < -0.1 && allow_next) {
                 next_preview.style.transform = 'translateY(-100%)';
                 video.style.transform = 'translateY(-100%)';
                 next();
@@ -166,29 +173,34 @@
             posY = 0;
         });
 
-        video.addEventListener('loadedmetadata', function () {
-            update_next_preview();
+        // video.addEventListener('loadedmetadata', function () {
+        //     hide_next_preview();
+        // });
+        next_preview.addEventListener('load', function () {
+            this.style.opacity = 1;
+            next_preview.style.transition = 'opacity 0.3s';
+            allow_next = true;
+            preview_loading.style.opacity = 0;
+        });
+        next_preview.addEventListener('error', function () {
+            allow_next = true;
         });
 
         var vid_history = [];
 
-        function load_next() {
-            //check if there are more than 2 videos in history
-            if (vid_history.length < 2) {
-                return;
-            }
-            video.pause();
-            // console.log(vid_history);
-            //get the second last video
-            video_data = vid_history[vid_history.length - 2];
-            container_bg.src = video_data.preview;
-            // video.style.opacity = 0;
+        function preload_next() {
             video_preload.src = vid_history[vid_history.length - 1].url;
             avatar_preload.src = vid_history[vid_history.length - 1].avatar;
-            video.src = video_data.url;
+            update_next_preview();
+        }
+
+        function load_next() {
+            video.pause();
+            video_data = vid_history[vid_history.length - 1];
 
             setTimeout(() => {
-                // video.style.opacity = 1;
+                // container_bg.src = video_data.preview;
+                video.src = video_data.url;
                 avatar.src = video_data.avatar;
                 if (video_data.type == 'reddit') {
                     author_id.textContent = 'u/' + video_data.author_id;
@@ -198,7 +210,7 @@
                     author_id.textContent = '@' + video_data.author_id;
                     author.textContent = video_data.author;
                 }
-                time_label.textContent = video_data.time;
+                date_label.textContent = video_data.date;
                 description.innerHTML = video_data.description;
                 like_cnt.textContent = video_data.likes;
                 comment_cnt.textContent = video_data.comments;
@@ -222,21 +234,21 @@
                 video.style.transition = 'none';
                 video.style.transform = 'translateY(0)';
                 video.play();
-                next_preview.style.opacity = 0;
                 setTimeout(() => {
-                    next_preview.style.opacity = 1;
-                }, 300);
+                    next_preview.style.transition = 'none';
+                    next_preview.style.transform = 'translateY(0)';
+                }, 100);
             }, 300);
             idx += 1;
             if (item_cnt) {
                 item_cnt.innerHTML = idx - 1 + " <br><span class='total_cnt'>/{{total_cnt}}</span>";
             }
-            {% if total_cnt %}
-            if (idx > {{ total_cnt }}) {
-                idx = idx % {{ total_cnt }};
+            if (total_cnt) {
+                if (idx > total_cnt) {
+                    idx = idx % total_cnt;
+                }
             }
-            {% endif %}
-        full_opacity();
+            full_opacity();
         }
 
         function load_previous() {
@@ -245,6 +257,7 @@
             }
             // console.log(vid_history);
             //get the second last video
+            allow_next = true;
             video_data = vid_history[vid_history.length - 3];
             avatar.src = video_data.avatar;
             if (video_data.type == 'reddit') {
@@ -255,7 +268,7 @@
                 author_id.textContent = '@' + video_data.author_id;
                 author.textContent = video_data.author;
             }
-            time_label.textContent = video_data.time;
+            date_label.textContent = video_data.date;
             description.innerHTML = video_data.description;
             like_cnt.textContent = video_data.likes;
             comment_cnt.textContent = video_data.comments;
@@ -287,30 +300,42 @@
         }
 
         function update_next_preview() {
-            // video_preload.src = vid_history[vid_history.length - 1].url;
+            console.log('updating next preview');
             setTimeout(() => {
-                next_preview.style.transition = 'opacity 0.3s';
+                next_preview.style.transition = 'none';
                 next_preview.style.transform = 'translateY(0)';
+                next_preview.style.opacity = 0;
+                allow_next = false;
                 next_preview.src = vid_history[vid_history.length - 1].preview;
-            }, 300);
+            }, 300); // timeout to match video transition
         }
 
         function next() {
-            fetch('{{url_base}}/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
+            if (!allow_next) {
+                return;
+            }
+            allow_next = false;
+            preview_loading.style.opacity = 0.5;
+            load_next();
+            fetch('{{url_base}}/api/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.error) {
+                    if (data.status === 'error') {
+                        alert(data.message);
                         return;
                     }
                     vid_history.push(data);
                     if (vid_history.length > 20) {
                         vid_history.shift();
                     }
-                    load_next();
+                    preload_next();
                 })
         }
 
         function next_with_transition() {
+            if (!allow_next) {
+                return;
+            }
             next_preview.style.transition = 'transform 0.3s, opacity 0.3s';
             video.style.transition = 'transform 0.3s';
             next_preview.style.transform = 'translateY(-100%)';
@@ -330,13 +355,16 @@
                     else {
                         fav_img.src = "{{url_base}}/img/bookmark_empty.svg";
                     }
-                    vid_history[vid_history.length - 2].fav = data['result'] == 'added';
+                    vid_history[vid_history.length - 2].fav = data.status == 'ok';
                 })
         }
 
         var wheel_debounce = false;
         video_container.addEventListener('wheel', function (event) {
             if (wheel_debounce) {
+                return;
+            }
+            if (!allow_next) {
                 return;
             }
             wheel_debounce = true;
@@ -391,11 +419,11 @@
         });
         function init_video() {
             vid_history = []
-            fetch('{{url_base}}/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
+            fetch('{{url_base}}/api/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.error) {
-                        alert(data.error);
+                    if (data.status === 'error') {
+                        alert(data.message);
                         history.back();
                         return;
                     }
@@ -438,7 +466,9 @@
 
         function hide_loading_icon() {
             const loading_icon = parent.document.getElementById('loading_icon');
-            loading_icon.style.display = 'none';
+            if (loading_icon) {
+                loading_icon.style.display = 'none';
+            }
         }
 
         hide_loading_icon();

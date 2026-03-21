@@ -5,84 +5,128 @@
     <meta charset="UTF-8" />
     <title>{{title}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="stylesheet" href="{{url_base}}/css/nav.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/style.css" />
     <link rel="stylesheet" href="{{url_base}}/css/timeline.css" />
     <link rel="stylesheet" href="{{url_base}}/css/userlist.css" />
     <link rel="stylesheet" href="{{url_base}}/css/userpage.css" />
     <link rel="stylesheet" href="{{url_base}}/css/mediagrid.css" />
+    <link rel="stylesheet" id="landscape_style" href="{{url_base}}/css/landscape.css" disabled />
     <link rel="manifest" href="{{url_base}}/mt.webmanifest" crossorigin="use-credentials">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+    <meta http-equiv="Content-Security-Policy"
+        content="script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
 </head>
 
 <body>
-    <div class="container_outer" id="container_outer" autofocus>
-        <div class="container" id="container"
-        {% if adjust_padding_top %} style="padding-top: 0rem;" {% endif %} >
-            {{ content | safe }}
-        </div>
-    </div>
-    <div class="nav">
+    <script src="{{url_base}}/js/landscape.js"></script>
+    <div class="nav translucent">
         <div class="nav_item_warp">
-            <a class="nav_item {% if section=='users' %}nav_item_selected{% endif %}" href="{{url_base}}/userlist">
+            <a class="nav_item" href="{{url_base}}/userlist">
                 <img src="{{url_base}}/img/home.svg" />
+                {% if section=='user' %}
+                <div class="nav_item_deco"></div>
+                {% endif %}
             </a>
-            <a class="nav_item {% if section=='tl' %}nav_item_selected{% endif %}" href="{{url_base}}/tl">
+            <a class="nav_item" href="{{url_base}}/tl">
                 <img src="{{url_base}}/img/timeline.svg" />
+                {% if section=='tl' %}
+                <div class="nav_item_deco"></div>
+                {% endif %}
             </a>
-            
-            <a class="nav_item {% if section=='fav' %}nav_item_selected{% endif %}" href="{{url_base}}/fav">
-                <img src="{{url_base}}/img/bookmark_empty.svg" />
-            </a>
-            
-            {% if alt_home_icon %}
-            <a class="nav_item"
-                href="{{url_base}}/shorts?type={{user.type}}&user={{user.user_name}}" onclick="show_loading_icon()">
-                <img class="alt_home_icon" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
-                <img src="{{url_base}}/img/video.svg" style="transform: scale(1.1);" />
-            </a>
-            {% else %}
-            <a class="nav_item" href="{{url_base}}/shorts?q={{current_q}}" onclick="show_loading_icon()">
-                <img src="{{url_base}}/img/video.svg" style="transform: scale(1.1);" />
-            </a>
-            {% endif %}
 
-            <a class="nav_item {% if section=='download' %}nav_item_selected{% endif %}" href="{{url_base}}/download">
+            <a class="nav_item" href="{{url_base}}/fav">
+                <img src="{{url_base}}/img/bookmark_empty.svg" />
+                {% if section=='fav' %}
+                <div class="nav_item_deco"></div>
+                {% endif %}
+            </a>
+
+            <a class="nav_item" href="{{url_base}}/shorts?q={{shorts_q}}" onclick="show_loading_icon()"
+                style="overflow: visible;">
+                <img src="{{url_base}}/img/video.svg" style="transform: scale(1.1);" />
+                {% if shorts_icon or shorts_decoration %}
+                <div class="shorts_decoration">
+                    {% if shorts_icon %}
+                    <img src="{{shorts_icon}}" />
+                    {% elif shorts_decoration %}
+                    <span>{{shorts_decoration}}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </a>
+
+            <a class="nav_item" href="{{url_base}}/download">
                 <img src="{{url_base}}/img/dl.svg" />
+                {% if section=='download' %}
+                <div class="nav_item_deco"></div>
+                {% endif %}
+            </a>
+            <a class="nav_item" href="{{url_base}}/settings">
+                <img src="{{url_base}}/img/gear.svg" />
+                {% if section=='settings' %}
+                <div class="nav_item_deco"></div>
+                {% endif %}
             </a>
         </div>
     </div>
     <div class="page_control" id="page_control">
         {% if current_page > 1 %}
-        <div class="page_control_warp" style="margin-left: -2.25rem;">
+        <div class="page_control_warp translucent" style="margin-left: -2.25rem;">
             <div class="page_control_item" onclick="go_page(1)">
-                <img src="{{url_base}}/img/home2.svg" style="transform: scale(0.6);"/>
+                <img src="{{url_base}}/img/home2.svg" style="transform: scale(0.6);" />
             </div>
         </div>
         {% endif %}
-        <div class="page_control_warp">
+        <div class="page_control_warp translucent">
             <div class="page_control_item" id="btn_prev" onclick="prev_page()">
                 <img src="{{url_base}}/img/left.svg" />
             </div>
             <div class="page_control_item" id="page_text" onclick="go_page()">
-                <span style="font-size: 0.9rem;">{{ current_page }}</span> / <span style="font-size: 0.7rem;"> {{ max_page }} </span>
+                <span style="font-size: 0.9rem;">{{ current_page }}</span> / <span style="font-size: 0.7rem;"> {{
+                    max_page }} </span>
             </div>
             <div class="page_control_item" id="btn_next" onclick="next_page()">
                 <img src="{{url_base}}/img/right.svg" />
             </div>
         </div>
     </div>
-    <button class="back-to-top" onclick="enter_fullscreen()" style="left: 3rem;">
+    <button class="tiny_btn translucent" onclick="enter_fullscreen()" style="right: 2.7rem;">
         <img src="{{url_base}}/img/full.svg" style="transform: scale(0.65);" />
     </button>
-    <button class="back-to-top" onclick="scrollToTop()">
+    <button class="tiny_btn translucent" onclick="scrollToTop()" style="right: 0.5rem;">
         <img src="{{url_base}}/img/left.svg" />
     </button>
 
+    {% if show_back_btn %}
+    <a id="back_btn" class="float_btn" onclick="window.history.back(); return false;">
+        <img src="{{url_base}}/img/left.svg" style="transform: scale(0.8);">
+    </a>
+    {% endif %}
+    {% if title_str %}
+    <div class="float_title translucent">
+        <span class="float_title_str">{{ title_str }}</span>
+        {% if title_secondary_str %}
+        <span class="float_title_secondary">{{ title_secondary_str }}</span>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    
+    <div class="container_outer" id="container_outer" autofocus>
+        <div class="container" id="container" {% if adjust_padding_top %} style="padding-top: {{adjust_padding_top}};"{% endif %}>
+            {{ content | safe }}
+        </div>
+    </div>
 
     <div class="float_card" id="float_card"></div>
+    <div id="alt_text">
+        <div id="alt_text_text"></div>
+        <a id="close_alt_btn" class="float_btn" onclick="hide_alt()">
+            <img src="{{url_base}}/img/cross.svg" style="transform: scale(0.8);">
+        </a>
+    </div>
+    <div id="toast_div">Testing testing 123456 test.</div>
 
-    <script src="{{url_base}}/js/panzoom.js"></script>
     <script>
         var current_page = {{ current_page }};
         var current_q = encodeURIComponent("{{ current_q }}");
@@ -91,7 +135,7 @@
         var url_base = "{{url_base}}";
     </script>
     <script src="{{url_base}}/js/noreferer.js"></script>
-    <script src="{{url_base}}/js/nav.js"></script>
+    <script src="{{url_base}}/js/script.js"></script>
 </body>
 
 </html>

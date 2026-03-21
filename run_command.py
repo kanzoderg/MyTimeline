@@ -25,11 +25,6 @@ def interrupt():
     try:
         # Send SIGTERM to the entire process group
         os.killpg(os.getpgid(_current_process.pid), signal.SIGTERM)
-        time.sleep(1)
-        # If still running, force kill
-        if _current_process and _current_process.poll() is None:
-            logger.log("[Force killing command]")
-            os.killpg(os.getpgid(_current_process.pid), signal.SIGKILL)
     except ProcessLookupError:
         pass  # Process already exited
     except Exception as e:

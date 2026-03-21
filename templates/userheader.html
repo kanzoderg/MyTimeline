@@ -1,9 +1,10 @@
 <div class="user_header_full">
-    <a href="{{url_base}}/banner/{{user.type}}/{{user.user_name}}?redownload=1" target="_blank">
+    <a href="{{url_base}}/banner/{{user.type}}/{{user.user_name}}?redownload=1">
         <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_header_banner" />
     </a>
+    <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" id="background_banner" />
     <div class="user_header">
-        <a href="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}?redownload=1" target="_blank">
+        <a href="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}?redownload=1">
             <img class="user_header_img" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
         </a>
         <div class="user_header_txt">
@@ -17,12 +18,13 @@
             <div class="user_header_date">~ {{user.user_name}}</div>
             {% endif %}
         </div>
-        <div style="margin: 0.5rem; font-size: 0.9rem; margin-left: 0.9rem;">{{posts_cnt}} <span style="opacity: 0.6;">Posts</span></div>
+        <div style="margin: 0.5rem; font-size: 0.9rem; margin-left: 0.9rem;">{{posts_cnt}} <span
+                style="opacity: 0.6;">Posts</span></div>
         <div class="user_body_text">
             {{user.description | safe}}
         </div>
-        <a class="user_header_button" href="{{url_base}}/download?url={{user.url}}" style="right: 3.5rem;">
-            <img src="{{url_base}}/img/reload.svg" />
+        <a class="user_header_button" onclick="toggle_user_context_menu()" style="right: 3.5rem;">
+            <img src="{{url_base}}/img/3dots.svg" />
         </a>
         {% if user.type == 'x' %}
         <a class="user_header_button" href="{{user.url}}" target="_blank">
@@ -33,26 +35,40 @@
             <img src="{{url_base}}/img/bsky.svg" />
         </a>
         {% elif user.type == 'reddit' %}
-        <a class="user_header_button" href="https://www.reddit.com/r/{{user.user_name}}" target="_blank">
-            <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);"/>
+        <a class="user_header_button" href="{{user.url}}" target="_blank">
+            <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);" />
         </a>
         {% elif user.type == 'fa' %}
         <a class="user_header_button" href="https://www.furaffinity.net/user/{{user.user_name}}" target="_blank">
-            <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);"/>
+            <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);" />
         </a>
         {% endif %}
         <div class="user_header_update_time">
             Updated: {{user.get_update_time_str()}}
         </div>
-        
+
         {% if user.flagged %}
         <div class="flagged" style="top: 0.85rem; right: 14.9rem; bottom: auto; left: auto; transform: scale(0.8);">
             <img src="{{url_base}}/img/flagged.svg" />
         </div>
         {% endif %}
     </div>
-    <a class="user_header_button" onclick="window.history.back(); return false;" id="back_btn">
-        <img src="{{url_base}}/img/left.svg" />
-    </a>
+    <div id="user_context_menu_warpper" style="display: none;">
+        <div id="user_context_menu" class="context_menu">
+            <a class="context_item" onclick="add_job('{{user.url}}', false, false)">
+                <img src="{{url_base}}/img/reload.svg" class="inline_icon" /> Update</a>
+            <a class="context_item" onclick="add_job('{{user.url}}', false, true)">
+                <img src="{{url_base}}/img/reload.svg" class="inline_icon" /> Update (media only)</a>
+            <a class="context_item" onclick="flag_user('{{user.uid}}')"><img src="{{url_base}}/img/flag.svg"
+                    class="inline_icon" /> Flag User</a>
+            <a class="context_item" onclick="unflag_user('{{user.uid}}')"><img src="{{url_base}}/img/unflag.svg"
+                    class="inline_icon" /> Unflag User</a>
+            <a class="context_item" onclick="add_rescan('{{user.url}}')"><img src="{{url_base}}/img/scan.svg"
+                    class="inline_icon" /> Scan</a>
+        </div>
+        <div id="user_context_menu_background" class="context_menu_background" onclick="toggle_user_context_menu()">
+        </div>
+    </div>
 </div>
+
 <script src="{{url_base}}/js/noreferer.js"></script>

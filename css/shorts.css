@@ -57,6 +57,11 @@ body {
     color: var(--accent-color-light);
 }
 
+.iconusername,
+.hashtag {
+    color: #ff9646;
+}
+
 .video_container {
     position: fixed;
     top: 0;
@@ -126,7 +131,7 @@ body {
     font-size: 0.9rem;
 }
 
-#author_id, #time {
+#author_id, #date {
     font-size: 0.7rem;
     opacity: 0.8;
 }
@@ -264,4 +269,30 @@ body {
 .total_cnt {
     font-size: 0.7rem;
     opacity: 0.8;
+}
+
+
+/* HTML: <div class="loader"></div> */
+.loader {
+  width: 10px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  animation: l5 1s infinite linear alternate;
+}
+@keyframes l5 {
+    0%  {box-shadow: 20px 0 #fff, -20px 0 #fff2;background: #fff }
+    33% {box-shadow: 20px 0 #fff, -20px 0 #fff2;background: #fff2}
+    66% {box-shadow: 20px 0 #fff2,-20px 0 #fff; background: #fff2}
+    100%{box-shadow: 20px 0 #fff2,-20px 0 #fff; background: #fff }
+}
+
+#preview_loading{
+    pointer-events: none;
+    position: fixed;
+    bottom: 0.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    scale: 0.7;
+    transition: opacity 0.3s;
+    opacity: 0.5;
 }

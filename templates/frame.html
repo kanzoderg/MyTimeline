@@ -11,26 +11,22 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
     <meta name="mobile-web-app-capable" content="yes">
     <style>
-        html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-        }
-
+        
         body {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
             overflow: hidden;
             background-color: #000;
         }
 
         iframe {
+            position: fixed;
             border: none;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+            top: 0;
+            left: 0;
         }
 
         #loading_icon {
@@ -102,11 +98,16 @@
     </div>
     <div class="drag_area"></div>
     <script>
+        // handles reloading, saveing, and restoring iframe state
         // save iframe current location and scroll position before unload
         window.addEventListener('beforeunload', function () {
             const iframe = document.querySelector('iframe');
             const iframeWindow = iframe.contentWindow;
             const iframeSrc = iframeWindow.location.href;
+            if (iframeSrc.includes("shorts")||iframeSrc.includes("ruffle")||iframeSrc.includes("about:blank")) {
+                // do not save those positions, as they may cause issues when restored
+                return;
+            }
             const scrollPosition = iframeWindow.scrollY || iframeWindow.pageYOffset;
             localStorage.setItem('mt_iframeSrc', iframeSrc);
             localStorage.setItem('mt_iframeScrollPosition', scrollPosition);
@@ -120,18 +121,18 @@
             const savedScrollPosition = localStorage.getItem('mt_iframeScrollPosition');
             const savedTimestamp = localStorage.getItem('mt_iframeTimestamp');
             const now = Date.now();
-            if (savedTimestamp && now - savedTimestamp > 60 * 60 * 1000) {
+            if (savedTimestamp && now - savedTimestamp > 20 * 1000) {
                 localStorage.removeItem('mt_iframeSrc');
                 localStorage.removeItem('mt_iframeScrollPosition');
                 localStorage.removeItem('mt_iframeTimestamp');
-                iframe.src = "{{url_base}}/tl";
+                iframe.src = "{{url_base}}/userlist";
                 return;
             }
             if (savedSrc) {
                 iframe.src = savedSrc;
                 iframe.contentWindow.scrollTo(0, parseInt(savedScrollPosition) || 0);
             } else {
-                iframe.src = "{{url_base}}/tl";
+                iframe.src = "{{url_base}}/userlist";
             }
         });
     </script>

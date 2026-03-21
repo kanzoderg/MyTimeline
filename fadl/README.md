@@ -1,0 +1,1 @@
+# FADL: Furaffinity downloalder

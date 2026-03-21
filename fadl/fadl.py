@@ -16,6 +16,9 @@ arg_parser.add_argument(
 arg_parser.add_argument("-f", "--force", action="store_true", help="Force fetch all.")
 arg_parser.add_argument("--a", default=auth.a, help="Authentication cookie 'a'")
 arg_parser.add_argument("--b", default=auth.b, help="Authentication cookie 'b'")
+arg_parser.add_argument(
+    "--proxy", default="", help="Proxy URL (e.g., http://127.0.0.1:10808)"
+)
 
 args = arg_parser.parse_args()
 
@@ -23,13 +26,20 @@ cookies = {"a": args.a, "b": args.b}
 headers = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
 }
-
+if args.proxy:
+    proxies = {"http": args.proxy, "https": args.proxy}
+else:
+    proxies = None
+if args.url:
+    args.url = args.url.strip().lower()
 
 def get(url):
     retry_count = 3
     for attempt in range(retry_count):
         try:
-            response = requests.get(url, cookies=cookies, headers=headers, timeout=10)
+            response = requests.get(
+                url, cookies=cookies, headers=headers, proxies=proxies, timeout=10
+            )
             response.raise_for_status()
             return response
         except requests.RequestException as e:
@@ -50,6 +60,8 @@ def scan_existing_items(user):
     user_path = os.path.join(args.output, user)
     if not os.path.exists(user_path):
         return
+    print(f"Scanning existing items for user {user}...")
+    print(f"Looking in {user_path}...")
     for filename in os.listdir(user_path):
         if filename.endswith(".json") and re.match(r"\d+", filename):
             try:
@@ -149,7 +161,7 @@ class Item:
         if user:
             put_user_info(self.user)
             scan_existing_items(user)
-            if id_ in exsisting_items:
+            if id_ in exsisting_items and category in ["gallery", "scraps"]:
                 self.already_exists = True
                 print(f"l150: Already exists: [{ self.id_}] {self.user}")
 
@@ -201,7 +213,7 @@ class Item:
                     return
             put_user_info(self.user)
             scan_existing_items(self.user)
-            if self.id_ in exsisting_items:
+            if self.id_ in exsisting_items and self.category in ["gallery", "scraps"]:
                 print(f"l190: Already exists: [{ self.id_}] {self.user}")
                 self.already_exists = True
                 return
@@ -229,7 +241,7 @@ class Item:
                 .split("/")[-1]
             )
             self.artist = soup.find(class_="c-usernameBlock__displayName").text.strip()
-            self.title = soup.find(class_="journal-title").text.strip()
+            self.title = (soup.find(class_="journal-title") or soup.find(id="c-journalTitleTop__subject")).text.strip()
             self.filename = f"{self.id_}"
             self.timestamp = int(soup.find(class_="popup_date")["data-time"])
             self.date = time.strftime(

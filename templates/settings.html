@@ -1,0 +1,46 @@
+<div class="setting_items">
+    <div class="setting_item big_btn translucent" id="info"></div>
+    <div id="logs" class="logs_settings"></div>
+    <a class="setting_item big_btn translucent" href="{{url_base}}/logs">View Full Logs</a>
+    <a class="setting_item big_btn translucent" href="{{url_base}}/logout">Logout</a>
+    <a class="setting_item big_btn translucent" onclick="stop_server()">Stop</a>
+</div>
+<script>
+    // {{url_base}}/api/stats
+    function fetch_stats() {
+        fetch('{{url_base}}/api/stats', {
+            method: 'GET',
+        }).then(response => response.json())
+            .then(data => {
+                document.getElementById('info').innerText = JSON.stringify(data, null, 2);
+            })
+    }
+    fetch_stats();
+
+    function stop_server() {
+        if (!confirm("Are you sure you want to stop the server? Make sure you have set up a restart mechanism (like systemd) to automatically restart it if needed.")) {
+            return;
+        }
+        fetch('{{url_base}}/api/stop', {
+            method: 'GET',
+        }).then(response => {
+            if (response.status === 200) {
+                alert("Server is stopping...");
+                location.reload();
+            } else {
+                response.json().then(data => {
+                    alert("Error: " + (data.message || "Unknown error"));
+                });
+            }
+        }).catch(error => {
+            alert("Network error: " + error);
+        });
+    }
+
+    setTimeout(() => {
+        update_logs(20, true)
+    }, 500)
+    setInterval(() => {
+        update_logs(20, false)
+    }, 2000)
+</script>

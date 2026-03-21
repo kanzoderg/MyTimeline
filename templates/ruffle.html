@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ruffle Player</title>
-    <script src="{{url_base}}/js/ruffle.js"></script>
+    <meta http-equiv="Content-Security-Policy"
+        content="script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
     <style>
         body, html {
             margin: 0;
@@ -27,6 +28,7 @@
 </head>
 <body>
     <div id="ruffle-container"></div>
+    <script src="{{url_base}}/js/ruffle.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const ruffle = window.RufflePlayer.newest();

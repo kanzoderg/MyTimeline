@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>{{title}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{url_base}}/css/style.css" />
+    <style>
+        #pin_code_input {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            background-color: #222;
+            border: solid 1px #555;
+            color: #eee;
+            border-radius: 0.5rem;
+        }
+        #pin_code_submit {
+            position: fixed;
+            top: calc(50% + 2.5rem);
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+
+<body>
+    <input type="password" id="pin_code_input" placeholder="Enter PIN code" autocomplete="off" />
+    <button class="big_btn translucent" id="pin_code_submit">login</button>
+    <script src="{{url_base}}/js/md5.min.js"></script>
+    <script>
+        const urlBase = "{{url_base}}";
+        document.getElementById("pin_code_submit").onclick = () => {
+            pinCode = document.getElementById("pin_code_input").value;
+            // to md5
+            pinCode = md5(pinCode);
+
+            fetch(`${urlBase}/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ pin: pinCode })
+            }).then(response => response.json()).then(data => {
+                if (data.status === "ok") {
+                    location.replace(`${urlBase}/userlist`);
+                } else {
+                    alert(data.message);
+                }
+            });
+        };
+        // Allow pressing Enter to submit
+        document.getElementById("pin_code_input").addEventListener("keyup", function(event) {
+            if (event.key === "Enter") {
+                document.getElementById("pin_code_submit").click();
+            }
+        });
+    </script>
+</body>
+
+</html>

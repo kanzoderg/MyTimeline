@@ -1,0 +1,31 @@
+// This is an example config file for MyTimeline, remove all comments and fill in the necessary fields before using.
+{
+    "host": "0.0.0.0",
+    "port": 8088,
+    "url_base": "", // if MT is served behind a reverse proxy with a url prefix, set it here, e.g. "/mt", if empty, MT will be served at root "/"
+    "cookies_list": {
+        "x": "./x.com_cookies.txt", // Netscape HTTP Cookie File Format, can be exported from browser using extensions
+        "bsky": "" // not needed for bluesky, MT will handle authentication and session management internally
+    },
+    "auth_files": {
+        "x": "", // not supported yet
+        "bsky": "./bsky_auth.json" // example {"username": "your-username", "password": "your-password"}, not needed at the moment, MT will handle authentication and session management internally, this is for future use when we want to support more features that require authentication
+        // furaffinity auth is set in fadl/auth.py, since its a seperate tool
+    },
+    "fs_bases": {
+        "x": "./downloads/twitter",
+        "bsky": "./downloads/bluesky",
+        "reddit": "./downloads/reddit",
+        "fa": "./downloads/furaffinity"
+    },
+    "cache_path": "~/.cache/mt",
+    "thumbnail_size": 600,
+    "custom_gallery_dl_location": "", // use a custom gallery-dl executable, if empty, MT will look for gallery-dl in current python environment
+    "items_per_page": 30,
+    "proxy": "", // http proxy or socks5 proxy, e.g. "http://127.0.0.1:12345" or "socks5h://127.0.0.1:12345", if empty, no proxy will be used
+    "no_auth": true, // if true, MT will not attempt to authenticate access, pins will be ignored
+    "user_pin": "1234", // pin for regular user access
+    "admin_pin": "1234", // pin for admin access, can access features like download and log viewing
+    "super_session_key": "", // if set, MT will use this session key as global session key, any request with this session key in header "X-Session-Key" will be treated as super user
+    "log_file": "./log.txt"
+}
