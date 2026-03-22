@@ -744,6 +744,7 @@ def build_app():
     @app.route(posixpath.join("/", config.url_base + "/"))
     @app.route(posixpath.join("/", config.url_base))
     def _index():
+        utils.copy_ua_from_request()
         return render_template("frame.html", url_base=config.url_base)
 
     @app.route(posixpath.join("/", config.url_base, "userlist"))
@@ -1558,13 +1559,36 @@ def build_app():
         return render_template(
             "logs.html", log_lines=log_lines, url_base=config.url_base
         )
+    
+
+    @app.route(posixpath.join("/", config.url_base, "api", "upload_cookies"), methods=["POST"])
+    @check_auth(required_role=utils.ROLE_ADMIN)
+    def _api_upload_cookies():
+        file = request.files["cookies"]
+        type = request.form.get("type", "")
+        if type not in ["x", "bsky", "reddit", "fa"]:
+            return {"status": "error", "message": "Invalid type."}
+        if type == "x":
+            save_path = "x.com_cookies.txt"
+        elif type == "fa":
+            save_path = "fadl/cookies.txt"
+        else:
+            return {"status": "error", "message": "Cookie upload not supported for this type."}
+        # check length of file, should not be too large
+        file.seek(0, os.SEEK_END)
+        file_length = file.tell()
+        file.seek(0)
+        if file_length > 1024 * 1024:
+            return {"status": "error", "message": "File too large."}
+        file.save(save_path)
+        logger.log(f"Cookies for {type} uploaded and saved to {save_path} by admin.")
+        return {"status": "ok", "message": f"Cookies for {type} uploaded successfully."}
 
     @app.route(posixpath.join("/", config.url_base, "cache_proxy", "<path:subpath>"))
     @check_auth()
     def cache_proxy(subpath):
         if not utils.check_link_allowed(subpath):
             return "Not allowed.", 403
-        logger.log(f"Proxying request for: {subpath}", type="attention")
         subpath = subpath.replace("http:", "").replace("https:", "")
         subpath = subpath.lstrip("/")
         if "itch." in subpath:
@@ -1583,6 +1607,7 @@ def build_app():
             logger.log(f"Serving from cache: {cache_path}", verbose=1)
             return set_cache_header(send_file(cache_path))
         else:
+            logger.log(f"Proxying request for: {subpath}", type="attention")
             os.makedirs("tmp/.cached", exist_ok=True)
             logger.log(f"Fetching from remote: {subpath}", type="attention")
             try:

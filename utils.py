@@ -10,6 +10,8 @@ from random import randint
 from uuid import uuid4
 from bs4 import BeautifulSoup
 
+from flask import request
+
 
 def time_it(func):
     def wrapper(*args, **kwargs):
@@ -41,8 +43,20 @@ busy_flag = False
 restart_needed = False
 
 global_headers = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 }
+
+
+def copy_ua_from_request():
+    global global_headers
+    if request and request.headers.get("User-Agent"):
+        global_headers["User-Agent"] = request.headers.get("User-Agent")
+        logger.log(
+            f"Copied User-Agent from request: {global_headers['User-Agent']}",
+            type="warning",
+            verbose=1,
+        )
+
 
 sort_keys = {
     "new": lambda x: x[4],
@@ -128,14 +142,48 @@ def get_proxy_dict():
     return None
 
 
+def select_cookies_for_url(url):
+    cookies_txt = None
+    cookies = {}
+    if "x.com" in url or "twitter.com" in url:
+        cookies_txt = config.cookies_list.get("x", None)
+    elif "bsky.app" in url:
+        cookies_txt = config.cookies_list.get("bsky", None)
+    elif "furaffinity.net" in url:
+        cookies_txt = config.cookies_list.get("fa", None) or "fadl/cookies.txt"
+    logger.log(
+        f"Selecting cookies for URL: {url}, using cookies file: {cookies_txt}",
+        verbose=1,
+    )
+    if cookies_txt and os.path.exists(cookies_txt):
+        with open(cookies_txt, "r", encoding="utf-8") as f:
+            cookies_txt = f.read()
+            for line in cookies_txt.splitlines():
+                if line.startswith("#") or not line.strip():
+                    continue
+                parts = line.strip().split("\t")
+                if len(parts) >= 7:
+                    name = parts[5]
+                    value = parts[6]
+                    cookies[name] = value
+    logger.log(f"Selected cookies: {cookies}", verbose=1)
+    return cookies
+
+
 def get(url, headers=None):
     comblined_headers = global_headers.copy()
     if headers:
         comblined_headers.update(headers)
+    # select cookies
+    cookies = select_cookies_for_url(url)
     for _ in range(3):
         try:
             return requests.get(
-                url, headers=comblined_headers, proxies=get_proxy_dict(), timeout=10
+                url,
+                headers=comblined_headers,
+                proxies=get_proxy_dict(),
+                timeout=10,
+                cookies=cookies,
             )
         except Exception as e:
             logger.log(
@@ -149,6 +197,8 @@ def post(url, json=None, headers=None):
     comblined_headers = global_headers.copy()
     if headers:
         comblined_headers.update(headers)
+    # select cookies
+    cookies = select_cookies_for_url(url)
     for _ in range(3):
         try:
             return requests.post(
@@ -157,6 +207,7 @@ def post(url, json=None, headers=None):
                 headers=comblined_headers,
                 proxies=get_proxy_dict(),
                 timeout=10,
+                cookies=cookies,
             )
         except Exception as e:
             logger.log(
@@ -368,6 +419,8 @@ class DownloadWorker(Thread):
                         "./fadl/fadl.py",
                         "-o",
                         user_fs_path,
+                        "--user-agent",
+                        f"\"{global_headers['User-Agent']}\"",
                         current_url,
                     ]
                     type = "fa"
@@ -598,7 +651,7 @@ def embed_hyperlink(type, text_content_in):
                         r"\d+?", parts[-1]
                     ):  # check if last part is not all numbers
                         continue
-                    if "@" in token and not '/' in token:
+                    if "@" in token and not "/" in token:
                         tokens[i] = (
                             f'<a class="hyperlink email" href="mailto:{token}" target="_blank">{token}</a>'
                         )

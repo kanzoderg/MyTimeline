@@ -856,6 +856,26 @@ function update_logs(line = 20, to_bottom = false) {
         })
 }
 
+function upload_cookies(type_name) {
+    const file_input = document.createElement('input');
+    file_input.type = 'file';
+    file_input.accept = '.txt';
+    file_input.onchange = e => {
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('cookies', file);
+        formData.append('type', type_name);
+        fetch(url_base + '/api/upload_cookies', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json())
+            .then(data => {
+                toast(data.message);
+            });
+    }
+    file_input.click();
+}
+
 
 // find all .iconusername and add show_loading_icon on click
 const icon_usernames = document.querySelectorAll('.iconusername');

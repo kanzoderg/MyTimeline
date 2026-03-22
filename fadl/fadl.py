@@ -6,7 +6,7 @@ import re, os, time, json
 import argparse
 from bs4 import BeautifulSoup as Soup
 
-import auth
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
 arg_parser = argparse.ArgumentParser(description="Furaffinity Downloader")
 arg_parser.add_argument("url")
@@ -14,24 +14,45 @@ arg_parser.add_argument(
     "-o", "--output", default="./downloads", help="Output directory"
 )
 arg_parser.add_argument("-f", "--force", action="store_true", help="Force fetch all.")
-arg_parser.add_argument("--a", default=auth.a, help="Authentication cookie 'a'")
-arg_parser.add_argument("--b", default=auth.b, help="Authentication cookie 'b'")
+arg_parser.add_argument(
+    "--cookies",
+    default=os.path.join(current_dir, "cookies.txt"),
+    help="Cookies for authentication",
+)
+arg_parser.add_argument(
+    "--user-agent",
+    default="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+    help="Custom User-Agent header",
+)
 arg_parser.add_argument(
     "--proxy", default="", help="Proxy URL (e.g., http://127.0.0.1:10808)"
 )
 
 args = arg_parser.parse_args()
 
-cookies = {"a": args.a, "b": args.b}
+cookies = {}
+if args.cookies and os.path.exists(args.cookies):
+    with open(args.cookies, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            parts = line.strip().split("\t")
+            if len(parts) >= 7:
+                name = parts[5]
+                value = parts[6]
+                cookies[name] = value
+
 headers = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    "User-Agent": args.user_agent
 }
+
 if args.proxy:
     proxies = {"http": args.proxy, "https": args.proxy}
 else:
     proxies = None
 if args.url:
     args.url = args.url.strip().lower()
+
 
 def get(url):
     retry_count = 3
@@ -40,7 +61,7 @@ def get(url):
             response = requests.get(
                 url, cookies=cookies, headers=headers, proxies=proxies, timeout=10
             )
-            response.raise_for_status()
+            # response.raise_for_status()
             return response
         except requests.RequestException as e:
             print(f"Attempt {attempt + 1} failed: {e}")
@@ -72,7 +93,7 @@ def scan_existing_items(user):
             except Exception as e:
                 print(f"Error reading {file_path}: {e}")
     print(f"Found {len(exsisting_items)} existing items for user {user}")
-    print(exsisting_items)
+    # print(exsisting_items)
 
 
 def put_user_info(user, no_overwrite=False):
@@ -241,7 +262,10 @@ class Item:
                 .split("/")[-1]
             )
             self.artist = soup.find(class_="c-usernameBlock__displayName").text.strip()
-            self.title = (soup.find(class_="journal-title") or soup.find(id="c-journalTitleTop__subject")).text.strip()
+            self.title = (
+                soup.find(class_="journal-title")
+                or soup.find(id="c-journalTitleTop__subject")
+            ).text.strip()
             self.filename = f"{self.id_}"
             self.timestamp = int(soup.find(class_="popup_date")["data-time"])
             self.date = time.strftime(
