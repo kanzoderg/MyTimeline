@@ -711,11 +711,13 @@ class Post:
             self.alts = self.alt.split("<sep>")
         self.text_content, link = utils.embed_hyperlink(self.type, row[1])
         if link:
-            if "furaffinity.net/view/" in link:
+            if utils.check_allowed_to_embed(link):
                 self.embed = self.embed or link
-            else:
+            elif utils.check_allowed_to_probe(link):
                 self.external_link = ExternalLink(link)
                 self.external_link.probe()
+            else:
+                self.embed = ""
         # check if post is in fav, ignore cache to always get latest fav status
         rows = db.query_rows("fav", "post_id", self.post_id, ignore_cache=True)
         if len(rows) > 0:
@@ -878,15 +880,17 @@ class Post:
                 post_id = self.embed.split("/")[-1]
                 user_name = self.embed.split("/")[-3]
                 type_ = "bsky"
-            elif "furaffinity.net/view/" in self.embed:
-                post_id = self.embed.strip("/").split("/")[-1]
+            elif (
+                "furaffinity.net/view/" in self.embed
+                or "furaffinity.net/journal/" in self.embed
+            ):
+                post_id = self.embed.split("?")[0].strip("/").split("/")[-1]
                 user_name = ""
                 type_ = "fa"
             else:
+                self.embed = ""
                 return
-            self.embed_obj = Post(
-                post_id, user_name, type_
-            )
+            self.embed_obj = Post(post_id, user_name, type_)
             self.embed_obj.is_external = not self.embed_obj.load_from_db()
             if not self.embed_obj.is_external:
                 self.embed_obj.init_medias()

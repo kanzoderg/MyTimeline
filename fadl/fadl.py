@@ -42,9 +42,30 @@ if args.cookies and os.path.exists(args.cookies):
                 value = parts[6]
                 cookies[name] = value
 
+# print("cookies:", cookies)
+
 headers = {
-    "User-Agent": args.user_agent
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,zh-TW;q=0.7",
+    "cache-control": "max-age=0",
+    "Priority": "u=0, i",
+    "Referer": "https://www.furaffinity.net/",
+    "sec-ch-ua-arch": '"x86"',
+    "sec-ch-ua-bitness": '"64"',
+    "sec-ch-ua-full-version-list": '"Chromium";v="146.0.0.0", "Not-A.Brand";v="24.0.0.0", "Brave";v="146.0.0.0"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-model": '""',
+    "sec-ch-ua-platform": '"Linux"',
+    "sec-ch-ua-platform-version": '""',
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-user": "?1",
+    "User-Agent": args.user_agent,
 }
+
+# print("Using headers:", headers)
 
 if args.proxy:
     proxies = {"http": args.proxy, "https": args.proxy}
@@ -61,12 +82,16 @@ def get(url):
             response = requests.get(
                 url, cookies=cookies, headers=headers, proxies=proxies, timeout=10
             )
-            # response.raise_for_status()
+            response.raise_for_status()
             return response
         except requests.RequestException as e:
             print(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(2)
             if attempt == retry_count - 1:
+                print(f"All {retry_count} attempts failed for URL: {url}")
+                print("=" * 50)
+                print("FA might be currently under `Under Attack` mode, which blocks requests that look like bots. Please pass the captcha in your browser, then export the cookies.txt and upload it. If you are already using cookies, try refreshing them. If the problem persists, you may need to wait until the attack mode is lifted.")
+                print("=" * 50)
                 raise
 
 

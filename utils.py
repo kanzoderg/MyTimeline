@@ -24,6 +24,20 @@ def time_it(func):
     return wrapper
 
 
+def strip_suffix(text, suffix):
+    if not suffix:
+        return text
+    while text.endswith(suffix):
+        text = text[: -len(suffix)]
+    return text
+
+
+def strip_suffix_list(text, suffixes):
+    for suffix in suffixes:
+        text = strip_suffix(text, suffix)
+    return text
+
+
 import config
 
 if not config.config_read:
@@ -46,13 +60,21 @@ global_headers = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 }
 
+if os.path.exists("tmp/ua.txt"):
+    with open("tmp/ua.txt", "r") as f:
+        ua = f.read().strip()
+        if ua:
+            global_headers["User-Agent"] = ua
+            logger.log(f"Loaded User-Agent from file: {global_headers['User-Agent']}")
 
 def copy_ua_from_request():
     global global_headers
     if request and request.headers.get("User-Agent"):
         global_headers["User-Agent"] = request.headers.get("User-Agent")
+        with open("tmp/ua.txt", "w") as f:
+            f.write(global_headers["User-Agent"])
         logger.log(
-            f"Copied User-Agent from request: {global_headers['User-Agent']}",
+            f"I'm stealing User-Agent from user: {global_headers['User-Agent']}",
             type="warning",
             verbose=1,
         )
@@ -93,20 +115,42 @@ def media_type_from_extension(extension):
         return UNKNOWN
 
 
-allowed_domain = [
-    "furaffinity.net",
-    "youtube.com",
-    "youtu.be",
+allowed_to_proxy = [
+    "furaffinity.net/",
     "ytimg.com",
     "fanbox.cc",
     "pixiv",
     "itch.",
 ]
 
+allowed_to_probe = [
+    "youtu.be",
+    "youtube.com",
+    "fanbox.cc",
+    "pixiv",
+    "itch.io",
+]
 
-def check_link_allowed(url):
-    for domain in allowed_domain:
-        if domain in url:
+allowed_to_embed = ["furaffinity.net/view/", "furaffinity.net/journal/", "at://"]
+
+
+def check_allowed_to_proxy(url):
+    for link in allowed_to_proxy:
+        if link in url:
+            return True
+    return False
+
+
+def check_allowed_to_probe(url):
+    for link in allowed_to_probe:
+        if link in url:
+            return True
+    return False
+
+
+def check_allowed_to_embed(url):
+    for link in allowed_to_embed:
+        if link in url:
             return True
     return False
 
@@ -563,6 +607,12 @@ def render_markdown(text_content):
 cache_embeded_link = {}
 
 
+def shorten_url(url, max_length=40):
+    if len(url) <= max_length:
+        return url
+    return url[:35] + "..."
+
+
 def embed_hyperlink(type, text_content_in):
     global cache_embeded_link
     display_link = ""
@@ -669,11 +719,11 @@ def embed_hyperlink(type, text_content_in):
                                 f'<a class="hyperlink iconusername" href="{config.url_base}/user/x/{token}">@{token}</a>'
                             )
                             continue
-                        if check_link_allowed(token):
+                        if check_allowed_to_embed(token) or check_allowed_to_probe(
+                            token
+                        ):
                             display_link = token
-                        url_shorten = token
-                        if len(token) > 30:
-                            url_shorten = token[:15] + "..." + token[-10:]
+                        url_shorten = shorten_url(token)
                         tokens[i] = (
                             f'<a class="hyperlink url" href="https://{token}" target="_blank">{url_shorten}</a>'
                         )
@@ -685,27 +735,60 @@ def embed_hyperlink(type, text_content_in):
     elif type == "reddit":
         text_content = render_markdown(text_content_in)
     elif type == "fa":
-        text_content = text_content_in.replace(
-            "//a.furaffinity.net/", config.url_base + "/cache_proxy/a.furaffinity.net/"
+        soup = BeautifulSoup(text_content_in, "html.parser")
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            href = href.replace("http://", "").replace("https://", "")
+            if href.startswith("/user/"):
+                umatch = href.strip("/").split("/")[-1]
+                a["href"] = f"{config.url_base}/user/fa/{umatch}"
+            elif (
+                ("twitter.com/" in href)
+                or ("x.com/" in href)
+                or ("bsky.app/profile/" in href)
+            ):
+                uname_match = (
+                    re.search(r"twitter.com/([a-zA-Z0-9\-\_\.]+)", href)
+                    or re.search(r"x.com/([a-zA-Z0-9\-\_\.]+)", href)
+                    or re.search(r"bsky.app/profile/([a-zA-Z0-9\-\_\.]+)", href)
+                )
+                if uname_match:
+                    token = uname_match.group(1)
+                    if "bsky.app/profile/" in href:
+                        a["href"] = f"{config.url_base}/user/bsky/{token}"
+                    else:
+                        a["href"] = f"{config.url_base}/user/x/{token}"
+                    a.string = "@" + token
+                    a["class"] = ["hyperlink", "iconusername"]
+            else:
+                a["target"] = "_blank"
+            if check_allowed_to_embed(href) or check_allowed_to_probe(href):
+                display_link = href
+        for img in soup.find_all("img", src=True):
+            src = img["src"]
+            src = src.replace("http://", "").replace("https://", "").lstrip("/")
+            # if src.startswith("a.furaffinity.net/"):
+            #     img["src"] = (
+            #         config.url_base
+            #         + "/cache_proxy/a.furaffinity.net/"
+            #         + src.split("/")[-1]
+            #     )
+            # elif src.startswith("d.furaffinity.net/"):
+            #     img["src"] = (
+            #         config.url_base
+            #         + "/cache_proxy/d.furaffinity.net/"
+            #         + src.split("/")[-1]
+            #     )
+            if re.match(r'[a-z]\.furaffinity\.net/', src):
+                img["src"] = (
+                    config.url_base
+                    + "/cache_proxy/"
+                    + src
+                )
+        text_content = str(soup)
+        text_content = strip_suffix_list(
+            text_content, ["<br>", "\n", "<br/>", "<br />", "</br>", "</h"]
         )
-        text_content = text_content.replace(
-            "https://d.furaffinity.net/",
-            config.url_base + "/cache_proxy/d.furaffinity.net/",
-        )
-        text_content = text_content.replace(
-            'href="/user/', f'href="{config.url_base}/user/fa/'
-        )
-        text_content = text_content.replace(
-            "https://twitter.com/", config.url_base + "/user/x/"
-        )
-        text_content = text_content.replace(
-            "https://x.com/", config.url_base + "/user/x/"
-        )
-        text_content = text_content.replace("\n", "")
-        while text_content.endswith("</br>"):
-            text_content = text_content[:-5]
-        while "</br>" * 7 in text_content:
-            text_content = text_content.replace("</br>" * 7, "")
 
     cache_embeded_link[text_content_in] = (text_content, display_link)
     return text_content, display_link

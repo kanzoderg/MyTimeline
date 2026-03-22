@@ -26,11 +26,11 @@ input:focus {
 }
 
 ::-webkit-scrollbar-track {
-    background: transparent;
+    background: none;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-color);
+    background: #ffffff33;
     border-radius: 4px;
 }
 
@@ -988,4 +988,13 @@ hr {
 
 .view_all_btn:hover {
     opacity: 1;
+}
+
+.no_user {
+    position: fixed;
+    display: inline-block;
+    left: 50%;
+    top: 50%;
+    transform: translateX(-50%) translateY(-50%);
+    opacity: 0.7;
 }

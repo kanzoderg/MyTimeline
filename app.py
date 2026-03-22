@@ -744,7 +744,6 @@ def build_app():
     @app.route(posixpath.join("/", config.url_base + "/"))
     @app.route(posixpath.join("/", config.url_base))
     def _index():
-        utils.copy_ua_from_request()
         return render_template("frame.html", url_base=config.url_base)
 
     @app.route(posixpath.join("/", config.url_base, "userlist"))
@@ -1580,6 +1579,7 @@ def build_app():
         file.seek(0)
         if file_length > 1024 * 1024:
             return {"status": "error", "message": "File too large."}
+        utils.copy_ua_from_request()
         file.save(save_path)
         logger.log(f"Cookies for {type} uploaded and saved to {save_path} by admin.")
         return {"status": "ok", "message": f"Cookies for {type} uploaded successfully."}
@@ -1587,7 +1587,7 @@ def build_app():
     @app.route(posixpath.join("/", config.url_base, "cache_proxy", "<path:subpath>"))
     @check_auth()
     def cache_proxy(subpath):
-        if not utils.check_link_allowed(subpath):
+        if not utils.check_allowed_to_proxy(subpath):
             return "Not allowed.", 403
         subpath = subpath.replace("http:", "").replace("https:", "")
         subpath = subpath.lstrip("/")
@@ -1612,6 +1612,8 @@ def build_app():
             logger.log(f"Fetching from remote: {subpath}", type="attention")
             try:
                 r = utils.get(subpath)
+                if r.status_code != 200:
+                    raise Exception(f"Failed to fetch {subpath}, status code: {r.status_code}")
                 bin_ = r.content
                 if len(bin_) < 1024:
                     raise Exception("Too small")

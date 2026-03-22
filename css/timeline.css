@@ -246,6 +246,15 @@
     width: 1.5rem;
 }
 
+.view_post {
+    right: 3rem;
+}
+
+/* 
+.view_post img {
+    scale: 0.8;
+} */
+
 .media_viewer {
     position: fixed;
     border: none;
@@ -302,10 +311,14 @@
 .card_embed {
     display: block;
     position: relative;
-    border: 1px solid #ffffff22;
+    border: 1px solid #ffffff33;
     border-radius: 0.7rem;
     margin: 0.4rem;
     overflow: hidden;
+}
+
+.card_embed:hover {
+    border-color: #ffffff55;
 }
 
 .card_embed_url {

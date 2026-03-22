@@ -184,7 +184,13 @@
             {% endfor %}
         </div>
         {% endif %}
-        <a href="{{post.embed_obj.url}}" class="card_link" target="_blank" style="position: absolute;">
+        <!-- <a href="{{post.embed_obj.url}}" class="card_link" target="_blank" style="position: absolute;">
+            <img src="{{url_base}}/img/link.svg" />
+        </a> -->
+        <a href="{{post.embed_obj.url}}" class="card_link" target="_blank">
+            <img src="{{url_base}}/img/open.svg" />
+        </a>
+        <a href="{{url_base}}/post/{{post.embed_obj.type}}/{{post.embed_obj.user_name}}/{{post.embed_obj.post_id}}" class="view_post card_link">
             <img src="{{url_base}}/img/link.svg" />
         </a>
         {% endif %}
@@ -230,6 +236,9 @@
         </a>
     </div>
     <a href="{{post.url}}" class="card_link" target="_blank">
+        <img src="{{url_base}}/img/open.svg" />
+    </a>
+    <a href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}" class="view_post card_link">
         <img src="{{url_base}}/img/link.svg" />
     </a>
     {% if post.reply_to %}

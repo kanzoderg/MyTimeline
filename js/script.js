@@ -899,4 +899,29 @@ card_body_texts.forEach(card_body_text => {
     }
 })
 
+const user_body_text = document.querySelector('.user_body_text');
+
+function show_full_user_info() {
+    if (!user_body_text) {
+        return false;
+    }
+    user_body_text.style.maxHeight = "unset";
+    user_body_text.style.overflow = "visible";
+    user_body_text.classList.remove("fade-text");
+    view_all_btn.style.display = "none";
+    return false;
+}
+
+if (user_body_text) {
+    if (isOverflown(user_body_text)) {
+        user_body_text.classList.add("fade-text");
+        view_all_btn = document.createElement('a')
+        view_all_btn.classList.add('view_all_btn')
+        view_all_btn.setAttribute("onclick", "show_full_user_info()")
+        view_all_btn.innerText = 'Expand'
+        user_body_text.after(view_all_btn)
+    }
+}
+
+
 hide_loading_icon();

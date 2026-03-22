@@ -47,7 +47,7 @@
     font-size: 0.9rem;
     max-height: 40vh;
     user-select: text;
-    overflow: auto;
+    overflow: hidden;
 }
 
 .user_header_button {
