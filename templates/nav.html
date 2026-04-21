@@ -5,11 +5,8 @@
     <meta charset="UTF-8" />
     <title>{{title}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
     <link rel="stylesheet" href="{{url_base}}/css/style.css" />
-    <link rel="stylesheet" href="{{url_base}}/css/timeline.css" />
-    <link rel="stylesheet" href="{{url_base}}/css/userlist.css" />
-    <link rel="stylesheet" href="{{url_base}}/css/userpage.css" />
-    <link rel="stylesheet" href="{{url_base}}/css/mediagrid.css" />
     <link rel="stylesheet" id="landscape_style" href="{{url_base}}/css/landscape.css" disabled />
     <link rel="manifest" href="{{url_base}}/mt.webmanifest" crossorigin="use-credentials">
     <meta name="mobile-web-app-capable" content="yes">
@@ -19,7 +16,8 @@
 
 <body>
     <script src="{{url_base}}/js/landscape.js"></script>
-    <div class="nav translucent">
+    <script src="{{url_base}}/js/script_preload.js"></script>
+    <div class="nav translucent" style="display: none;">
         <div class="nav_item_warp">
             <a class="nav_item" href="{{url_base}}/userlist">
                 <img src="{{url_base}}/img/home.svg" />
@@ -90,9 +88,6 @@
             </div>
         </div>
     </div>
-    <button class="tiny_btn translucent" onclick="enter_fullscreen()" style="right: 2.7rem;">
-        <img src="{{url_base}}/img/full.svg" style="transform: scale(0.65);" />
-    </button>
     <button class="tiny_btn translucent" onclick="scrollToTop()" style="right: 0.5rem;">
         <img src="{{url_base}}/img/left.svg" />
     </button>
@@ -110,7 +105,6 @@
         {% endif %}
     </div>
     {% endif %}
-
     
     <div class="container_outer" id="container_outer" autofocus>
         <div class="container" id="container" {% if adjust_padding_top %} style="padding-top: {{adjust_padding_top}};"{% endif %}>
@@ -133,9 +127,19 @@
         var max_page = {{ max_page }};
         var current_url = "{{current_url|safe}}";
         var url_base = "{{url_base}}";
+        var sort_type = "{{sort_type}}";
+        {% if section=='tl' %}
+        localStorage.setItem("tl_current_page", "{{current_page}}");
+        localStorage.setItem("tl_current_sort_type", "{{sort_type}}");
+        localStorage.setItem("tl_current_tab", "{{current_tab}}");
+        {% elif section=='userlist' %}
+        localStorage.setItem("ul_current_page", "{{current_page}}");
+        localStorage.setItem("ul_current_sort_type", "{{sort_type}}");
+        {% endif %}
     </script>
     <script src="{{url_base}}/js/noreferer.js"></script>
     <script src="{{url_base}}/js/script.js"></script>
+    <script src="{{url_base}}/js/logs.js"></script>
 </body>
 
 </html>

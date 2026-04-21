@@ -1,0 +1,33 @@
+::-webkit-scrollbar {
+    width: 0.8rem;
+}
+
+::-webkit-scrollbar-track {
+    background: #222;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 0.4rem;
+}
+
+.text_viewer {
+    display: block;
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+    width: 100%;
+    background-color: #222;
+}
+
+.text_container {
+    padding: 1rem;
+    font-size: 1.1rem;
+    line-height: 1.3rem;
+    box-sizing: border-box;
+    text-align: justify;
+    white-space: pre-wrap;
+    user-select: text;
+}
+
+.float_btn:hover {
+    background-color: var(--bg-with-alpha-hover-light);
+}

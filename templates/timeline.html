@@ -1,22 +1,41 @@
 <div class="timeline_toggle_bar">
     {% if section != "fav" %}
-    <select name="sort_type" id="sort_type" onchange="location.href='{{page_url}}?tab=posts&sort_type='+this.value{%if q%}+'&q={{q}}'{% endif %};show_loading_icon();" tabindex="-1">
-        <option value="new" {% if sort_type == "new" %}selected{% endif %}>New</option>
-        <option value="top" {% if sort_type == "top" %}selected{% endif %}>Top</option>
-        <option value="random" {% if sort_type == "random" %}selected{% endif %}>Random</option>
+    <select name="sort_toggle" class="sort_toggle" {%if section=='user'%}style="right:0.5rem"{%endif%} 
+        onchange="location.href='{{page_url}}?tab=posts&sort_type='+this.value{%if q%}+'&q={{q}}'{% endif %};show_loading_icon();"
+        tabindex="-1">
+        <option value="new" {% if sort_type=="new" %}selected{% endif %}>New</option>
+        <option value="top" {% if sort_type=="top" %}selected{% endif %}>Top</option>
+        {% if section == "tl" %}
+        <option value="random" {% if sort_type=="random" %}selected{% endif %}>Random</option>
+        {% endif %}
     </select>
-    <img src="{{url_base}}/img/down.svg" class="select_deco">
+    <!-- <img src="{{url_base}}/img/down.svg" class="select_deco"> -->
+    {% endif %}
+    
+    {% if section=='tl' %}
+    <div class="tl_deco"><img src="{{url_base}}/img/timeline.svg" /></div>
+    {% elif section=='fav' %}
+    <div class="tl_deco tl_deco_fav"><img src="{{url_base}}/img/bookmark_empty.svg" /></div>
     {% endif %}
 
     <div class="media_toggle">
-        <a class="toggle toggle_selected" href="{{page_url}}?tab=posts&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Posts</a>
-        <a class="toggle" href="{{page_url}}?tab=media&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Media</a>
+        <a class="toggle toggle_selected"
+            href="{{page_url}}?tab=posts&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Posts</a>
+        <a class="toggle"
+            href="{{page_url}}?tab=media&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Media</a>
+        {% if user_name %}
+        <!-- <a class="toggle" href="{{url_base}}/shorts?uid={{user_name}}@{{type}}">Videos</a> -->
+        {% endif %}
     </div>
+    <div class="sep_line"></div>
 </div>
 
-{% if sorted_posts_id | length == 0 and user_name %}
+{% if sorted_posts_ids | length == 0 and user_name %}
 <div class="notice_card">
-    No posts found.<br> Either the scan didn't complete or the user doesn't exist in database. Try use the <img src="{{url_base}}/img/reload.svg" style="height: 1rem; vertical-align: middle; background-color: #333; border-radius: 1rem; border: 2px solid #ffffff33;" /> update button above.
+    No posts found.<br> Either the scan didn't complete or the user doesn't exist in database. Try use the <img
+        src="{{url_base}}/img/reload.svg"
+        style="height: 1rem; vertical-align: middle; background-color: #333; border-radius: 1rem; border: 2px solid #ffffff33;" />
+    update button above.
 </div>
 {% if type == 'x' %}
 <a class="user_button" href="{{users[user_name].url}}" target="_blank">
@@ -25,27 +44,27 @@
 </a>
 {% elif type == 'bsky' %}
 <a class="user_button" href="{{users[user_name].url}}" target="_blank">
-    <img src="{{url_base}}/img/bsky.svg" /> 
+    <img src="{{url_base}}/img/bsky.svg" />
     <span>Open on Bluesky</span>
 </a>
 {% elif type == 'reddit' %}
 <a class="user_button" href="https://www.reddit.com/r/{{user_name}}" target="_blank">
-    <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);"/>
+    <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);" />
     <span>Open on Reddit</span>
 </a>
 {% elif type == 'fa' %}
 <a class="user_button" href="https://www.furaffinity.net/user/{{user_name}}" target="_blank">
-    <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);"/>
+    <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);" />
     <span>Open on Fur Affinity</span>
 </a>
 {% endif %}
-{% elif sorted_posts_id | length == 0 %}
+{% elif sorted_posts_ids | length == 0 %}
 <div class="notice_card">
     No posts found.
 </div>
 {% endif %}
 
-{% for post_id in sorted_posts_id %}
+{% for post_id in sorted_posts_ids %}
 {% set post = posts[post_id] %}
 {% set user = users[post.user_name] %}
 {% include 'card.html' %}

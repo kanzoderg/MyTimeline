@@ -13,7 +13,7 @@ sudo apt install ffmpeg -y
 
 ### 2. Edit config file `config.json`.
 
-### 3. Get your `x.com_cookies.txt` from browser extension.
+### 3. Get your `cookies.txt` from browser extension (Optional).
 
 ### 4. Launch from cli.
 
@@ -43,26 +43,6 @@ options:
 ### Or launch with Gunicorn
 `gunicorn -c ./gunicorn.conf.py "app:wsgi_app(config_file='config.json')"`
 
-## Screenshots
+## Screenshot
 
-#### Userlist
-
-<img src="screenshots/userlist_desktop.png" height="300">
-<img src="screenshots/userlist_mobile.png" height="300">
-
-#### Timeline and Media
-
-<img src="screenshots/post_mobile.png" height="300">
-<img src="screenshots/post_desktop.png" height="300">
-<img src="screenshots/media_desktop.png" height="300">
-<img src="screenshots/media_moblie.png" height="300">
-
-#### Media Viewer, Download Page and Rich text rendering
-
-<img src="screenshots/viewer.png" height="300">
-<img src="screenshots/download.png" height="300">
-<img src="screenshots/rich.png" height="300">
-
-#### ... and Doomscrolling
-
-<img src="screenshots/shorts.png" height="300">
+<img src="screenshots/1.png" height="300">

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Upload</title>
+    <link rel="stylesheet" href="{{ url_base }}/css/testpage.css">
+</head>
+<body>
+    <div class="container small">
+        <h1>Upload File</h1>
+        
+        <div class="post-id-display">
+            Uploading to Post: <strong>{{ post_id }}</strong>
+        </div>
+        
+        <form id="uploadForm" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="fileInput">Select File</label>
+                <input type="file" id="fileInput" name="file" required>
+            </div>
+            
+            <div class="button-group">
+                <input id="uploadSubmit" type="submit" value="Upload">
+            </div>
+        </form>
+    </div>
+    <script>
+        const uploadForm = document.getElementById("uploadForm");
+        const uploadSubmit = document.getElementById("uploadSubmit");
+
+        uploadForm.addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(uploadForm);
+            uploadSubmit.disabled = true;
+            uploadSubmit.value = "Uploading...";
+
+            try {
+                const response = await fetch(window.location.href, {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const message = await response.text();
+                alert(message);
+            } catch (error) {
+                alert("Upload failed: " + (error && error.message ? error.message : String(error)));
+            } finally {
+                uploadSubmit.disabled = false;
+                uploadSubmit.value = "Upload";
+            }
+        });
+    </script>
+</body>
+</html>

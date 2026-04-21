@@ -159,6 +159,8 @@ def put_user_info(user, no_overwrite=False):
         json.dump(user_info, f)
     print(f"Saved user info for {user}")
 
+def is_image_url(url):
+    return url.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".avif"))
 
 class Item:
     def __init__(
@@ -202,6 +204,7 @@ class Item:
         self.rating = ""
         self.filename = f"{id_}"
         self.image_url = ""
+        self.thumbnail_url = ""
         self.available = True
         self.already_exists = False
         if user:
@@ -209,12 +212,12 @@ class Item:
             scan_existing_items(user)
             if id_ in exsisting_items and category in ["gallery", "scraps"]:
                 self.already_exists = True
-                print(f"l150: Already exists: [{ self.id_}] {self.user}")
+                print(f"Already exists: [{ self.id_}] {self.user}")
 
     def parse(self):
         if not self.available:
             return
-        if self.already_exists:
+        if self.already_exists and not args.force:
             return
         if (
             self.category == "journals"
@@ -238,7 +241,7 @@ class Item:
             )
         ):
             print(f"Item {self.id_} is restricted to registered users only.")
-            print("Check your authentication (`a` and `b` variables) in auth.py")
+            print("Check your cookies and make sure you have access to this item in your browser.")
             self.available = False
             return
         if self.category in ["gallery", "scraps"]:
@@ -259,12 +262,15 @@ class Item:
                     return
             put_user_info(self.user)
             scan_existing_items(self.user)
-            if self.id_ in exsisting_items and self.category in ["gallery", "scraps"]:
-                print(f"l190: Already exists: [{ self.id_}] {self.user}")
+            if self.id_ in exsisting_items and self.category in ["gallery", "scraps"] and not args.force:
+                print(f"l266: Already exists: [{ self.id_}] {self.user}")
                 self.already_exists = True
                 return
             self.title = soup.find(class_="submission-title").text.strip()
             self.image_url = soup.find(class_="button", string="Download")["href"]
+            self.thumbnail_url = soup.find(id="submissionImg")
+            if self.thumbnail_url:
+                self.thumbnail_url = self.thumbnail_url["src"]
             self.filename = self.image_url.split("/")[-1]
             self.timestamp = int(soup.find(class_="popup_date")["data-time"])
             self.date = time.strftime(
@@ -303,23 +309,30 @@ class Item:
             self.rating = "N/A"
         if self.image_url.startswith("//"):
             self.image_url = "https:" + self.image_url
+        if self.thumbnail_url and self.thumbnail_url.startswith("//"):
+            self.thumbnail_url = "https:" + self.thumbnail_url
 
     def fetch(self):
         if not self.available:
             return
-        if self.already_exists:
-            return
         output_path = os.path.join(args.output, self.user)
         os.makedirs(output_path, exist_ok=True)
         file_path = os.path.join(output_path, self.filename)
-        if self.category in ["gallery", "scraps"]:
+        thumbnail_path = os.path.join(output_path, f"{self.filename}_thumb.jpg")
+        if self.category in ["gallery", "scraps"] and not self.already_exists:
             if os.path.exists(file_path):
-                print(f"l239 Already exists: [{ self.id_}] {file_path}")
+                print(f"Media file already exists: [{ self.id_}] {file_path}")
                 self.already_exists = True
             else:
                 resp = get(self.image_url)
                 with open(file_path, "wb") as f:
                     f.write(resp.content)
+                if not is_image_url(file_path) and self.thumbnail_url:
+                    # If the downloaded file is not an image, download the thumbnail as well
+                    resp = get(self.thumbnail_url)
+                    with open(thumbnail_path, "wb") as f:
+                        f.write(resp.content)
+        print(f"Saving metadata to {file_path}.json")
         with open(file_path + ".json", "w", encoding="utf-8") as f:
             data = {
                 "user": self.user,

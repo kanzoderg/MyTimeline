@@ -3,6 +3,7 @@
 <head>
     <title>Shorts</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
     <link rel="stylesheet" href="{{url_base}}/css/shorts.css" />
 </head>
 
@@ -64,7 +65,7 @@
                     </div>
                 </a>
             </div>
-            <a class="side_button" style="top: 1rem; left: 1rem;" onclick="history.back()">
+            <a class="side_button" style="top: 1rem; left: 1rem;" onclick="close_shorts()">
                 <div class="svg_wrap">
                     <img src="{{url_base}}/img/left.svg" />
                 </div>
@@ -79,6 +80,11 @@
             <a class="side_button" style="top: 1rem; right: 1rem;" onclick="enter_fullscreen()">
                 <div class="svg_wrap">
                     <img src="{{url_base}}/img/full.svg" style="transform: scale(0.4);" />
+                </div>
+            </a>
+            <a class="shuffle side_button" id="shuffle_btn" style="top: 1rem; right: 4.5rem;" onclick="toggle_random()">
+                <div class="svg_wrap">
+                    <img src="{{url_base}}/img/shuffle.svg" style="transform: scale(0.5);" />
                 </div>
             </a>
 
@@ -110,13 +116,40 @@
         fav_btn = document.querySelector('#fav_btn');
         fav_img = document.querySelector('#fav_img');
         user_link = document.querySelector('#user_link');
+        shuffle_btn = document.querySelector('#shuffle_btn');
 
         preview_loading = document.querySelector('#preview_loading');
 
         allow_next = true;
 
-        idx = {{ current_cnt }};
-        total_cnt = {{ total_cnt if total_cnt else 0 }};
+        // idx = {{ current_cnt }};
+        // total_cnt = {{ total_cnt if total_cnt else 0 }};
+        uid = "{{uid}}";
+        query = "{{query}}";
+        anchor = "{{anchor}}";
+        let sort_type = "random";
+
+        // Check local storage for saved sort type
+        if (localStorage.getItem('shorts_sort_type')) {
+            sort_type = localStorage.getItem('shorts_sort_type');
+        }
+
+        if (sort_type === "random") {
+            shuffle_btn.classList.add('shuffle_selected');
+        }
+
+        function toggle_random() {
+            if (sort_type == "random") {
+                sort_type = "new";
+                shuffle_btn.classList.remove('shuffle_selected');
+            }
+            else {
+                sort_type = "random";
+                shuffle_btn.classList.add('shuffle_selected');
+            }
+            // save to local storage
+            localStorage.setItem('shorts_sort_type', sort_type);
+        }
 
         video_container.addEventListener('click', function () {
             if (video.paused) {
@@ -239,15 +272,15 @@
                     next_preview.style.transform = 'translateY(0)';
                 }, 100);
             }, 300);
-            idx += 1;
-            if (item_cnt) {
-                item_cnt.innerHTML = idx - 1 + " <br><span class='total_cnt'>/{{total_cnt}}</span>";
-            }
-            if (total_cnt) {
-                if (idx > total_cnt) {
-                    idx = idx % total_cnt;
-                }
-            }
+            // idx += 1;
+            // if (item_cnt) {
+            //     item_cnt.innerHTML = idx - 1 + " <br><span class='total_cnt'>/{{total_cnt}}</span>";
+            // }
+            // if (total_cnt) {
+            //     if (idx > total_cnt) {
+            //         idx = idx % total_cnt;
+            //     }
+            // }
             full_opacity();
         }
 
@@ -292,10 +325,10 @@
             video.play();
             update_next_preview();
 
-            idx -= 1;
-            if (item_cnt) {
-                item_cnt.textContent = idx - 1 + '/' + '{{total_cnt}}';
-            }
+            // idx -= 1;
+            // if (item_cnt) {
+            //     item_cnt.textContent = idx - 1 + '/' + '{{total_cnt}}';
+            // }
             full_opacity();
         }
 
@@ -317,7 +350,8 @@
             allow_next = false;
             preview_loading.style.opacity = 0.5;
             load_next();
-            fetch('{{url_base}}/api/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
+            anchor = vid_history.length > 0 ? vid_history[vid_history.length - 1].media_id : 0;
+            fetch('{{url_base}}/api/get-a-vid' + `?uid=${uid}&q=${query}&anchor=${anchor}&sort_type=${sort_type}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'error') {
@@ -417,9 +451,10 @@
         video_seek.addEventListener('input', function () {
             video.currentTime = video_seek.value;
         });
+
         function init_video() {
             vid_history = []
-            fetch('{{url_base}}/api/get-a-vid?user={{user}}&q={{query}}&type={{type}}&idx=' + idx)
+            fetch('{{url_base}}/api/get-a-vid' + `?uid=${uid}&q=${query}&anchor=${anchor}&on_anchor=1&sort_type=${sort_type}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'error') {
@@ -428,18 +463,18 @@
                         return;
                     }
                     vid_history.push(data);
-                    idx += 1;
+                    // idx += 1;
                     next();
                 })
         }
 
-        function go() {
-            num = prompt("Page number", "");
-            if (num != null) {
-                idx = parseInt(num) - 1;
-                init_video()
-            }
-        }
+        // function go() {
+        //     num = prompt("Page number", "");
+        //     if (num != null) {
+        //         idx = parseInt(num) - 1;
+        //         init_video()
+        //     }
+        // }
         var full_opacity_timer = null;
         function full_opacity() {
             const ui = document.querySelector('.ui');
@@ -451,12 +486,19 @@
         }
 
         function enter_fullscreen() {
-            if (parent.document.fullscreenElement) {
-                parent.document.exitFullscreen();
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
             }
             else {
-                parent.document.documentElement.requestFullscreen();
+                document.documentElement.requestFullscreen();
             }
+        }
+
+        function close_shorts() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+            history.back();
         }
 
         item_cnt = document.querySelector('#item_cnt');
@@ -472,6 +514,10 @@
         }
 
         hide_loading_icon();
+
+        if (parent && parent.hide_navigation) {
+            parent.hide_navigation();
+        }
     </script>
     <script src="{{url_base}}/js/noreferer.js"></script>
 </body>

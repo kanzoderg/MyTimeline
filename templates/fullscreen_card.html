@@ -42,6 +42,10 @@
                 <div class="card_header_title">{{user.nick[:20]}}
                     <span class="card_header_name">~ {{user.user_name}}</span>
                 </div>
+                {% elif post.type == 'patreon' %}
+                <div class="card_header_title">{{user.nick[:20]}}
+                    <span class="card_header_name">on patreon</span>
+                </div>
                 {% endif %}
                 <div class="card_header_date">{{post.get_time_str()}}</div>
             </div>
@@ -82,13 +86,22 @@
     <a onclick="hide_float_card()" class="float_btn translucent" style="top: 1rem; left: 1rem;">
         <img src="{{url_base}}/img/cross.svg" style="transform: scale(0.8);" />
     </a>
-    <a onclick="enter_fullscreen()" class="float_btn translucent" style="top: 1rem; right: 1rem;">
+    <a onclick="viewer_enter_fullscreen()" class="float_btn translucent" style="top: 1rem; right: 1rem;">
         <img src="{{url_base}}/img/full.svg" style="transform: scale(0.5);" />
     </a>
     <a onclick="reset_media_transform()" id="reset_transform_btn" class="float_btn translucent"
         style="top: 1rem; right: 4rem; display: none;">
         <img src="{{url_base}}/img/reset.svg" style="transform: scale(0.4);" />
     </a>
+    {% if media.isvideo %}
+    <a href="{{url_base}}/shorts?uid={{post.uid}}&anchor={{media.media_id}}" class="float_btn translucent"
+        style="top: 1rem; right: 4rem;">
+        <img src="{{url_base}}/img/video.svg" style="transform: scale(0.7);" />
+    </a>
+    <div class="full_file_size translucent" style="bottom: 12.5rem;">{{media.get_size_str()}}</div>
+    {% else %}
+    <div class="full_file_size translucent">{{media.get_size_str()}}</div>
+    {% endif %}
 
     {% if prev_url %}
     <a onclick="show_float_card(event,'{{prev_url}}')" data-url="{{prev_url}}" class="float_btn translucent"

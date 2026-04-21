@@ -1,5 +1,5 @@
-{% if sorted_posts|length > 0 %}
-<img src="{{url_base}}/banner/{{sorted_posts[0].type}}/{{sorted_posts[0].user_name}}" id="background_banner" />
+{% if _banner_url %}
+<img src="{{_banner_url}}" id="background_banner" />
 {% endif %}
 
 {% if not post_found %}
@@ -9,7 +9,8 @@
     <a class="toggle toggle_selected" href="{{sorted_posts[0].url}}" target="_blank">Original Post</a>
 </div>
 {% else %}
-{% for post in sorted_posts %}
+{% for post_id in sorted_posts_ids %}
+{% set post = posts[post_id] %}
 {% set user = users[post.user_name] %}
 {% include 'card.html' %}
 {% endfor %}

@@ -3,6 +3,8 @@
     <!-- <div id="logs" class="logs_settings"></div> -->
     <a class="setting_item big_btn translucent" href="{{url_base}}/logs">View Full Logs</a>
     <a class="setting_item big_btn translucent" href="{{url_base}}/logout">Logout</a>
+    <a class="setting_item big_btn translucent" onclick="rescan()">Rescan Users</a>
+    <!-- <a class="setting_item big_btn translucent" onclick="rescan(1)">Full Rescan</a> -->
     <a class="setting_item big_btn translucent" onclick="upload_cookies('x')">Upload cookies.txt for X</a>
     <a class="setting_item big_btn translucent" onclick="upload_cookies('fa')">Upload cookies.txt for Furaffinity</a>
     <a class="setting_item big_btn translucent" onclick="stop_server()">Stop</a>
@@ -30,6 +32,25 @@
             if (response.status === 200) {
                 alert("Server is stopping...");
                 location.reload();
+            } else {
+                response.json().then(data => {
+                    alert("Error: " + (data.message || "Unknown error"));
+                });
+            }
+        }).catch(error => {
+            alert("Network error: " + error);
+        });
+    }
+
+    function rescan(full = false) {
+        if (!confirm("Are you sure you want to rescan users? This may take a while.")) {
+            return;
+        }
+        fetch('{{url_base}}/api/rescan?full=' + (full ? '1' : '0'), {
+            method: 'GET',
+        }).then(response => {
+            if (response.status === 200) {
+                alert("Rescan started...");
             } else {
                 response.json().then(data => {
                     alert("Error: " + (data.message || "Unknown error"));

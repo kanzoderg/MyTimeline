@@ -4,91 +4,50 @@
 <head>
     <title>Logs</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <link rel="stylesheet" href="{{url_base}}/css/style.css" />
     <style>
         body {
-            font-family: monospace;
             background-color: #000;
-            padding: 20px;
-            color: #f7f7f7;
-        }
-
-        .logs {
-            padding-bottom: 4rem;
-        }
-
-        .log-entry {
-            border-bottom: 1px solid #434343;
-            line-height: 1.1rem;
-            overflow-wrap: break-word;
-            word-break: break-all;
-            padding: 0.4rem;
-        }
-
-        .log-entry:hover {
-            background-color: #111;
+            color: var(--text-color);
         }
 
         #live {
             position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background-color: #222;
-            border-radius: 1rem;
-            padding: 10px;
-            border: 1px solid #444444;
+            bottom: 0.5rem;
+            right: 1rem;
+            font-size: 0.9rem;
         }
 
-        .info {
-            color: #f7f7f7;
-        }
-
-        .warning {
-            color: orange;
-        }
-
-        .error {
-            color: red;
-        }
-
-        .attention {
-            color: rgb(38, 132, 255);
+        #logs {
+            user-select: text;
+            height: auto;
+            max-height: calc(100vh - 4rem);
+            text-align: left;
         }
     </style>
 </head>
 
 <body>
-    <div class="logs">
-        {% for line in log_lines %}
-        <div class="log-entry {{ line[0] }}">{{ line[1] }}</div>
-        {% endfor %}
+    <div id="logs">
     </div>
-    <div id="live">
+    <div id="live" class="big_btn">
         <input type="radio" id="live_update" name="live_update" onclick="toggle_live()">
         <label for="live_update">Auto Reload</label>
     </div>
     <script>
-        let live = localStorage.getItem("live_update") === "true";
-        document.getElementById("live_update").checked = live;
-        function toggle_live() {
-            live = !live;
-            localStorage.setItem("live_update", live);
-            if (!live) {
-                console.log("Auto reload disabled");
-            } else {
-                console.log("Auto reload enabled");
-            }
-            location.reload();
-        }
-        if (live) {
-            setInterval(() => {
-                location.reload();
-            }, 4000);
-        }
+        var url_base = "{{url_base}}";
+    </script>
+    </script>
+    <script src="{{url_base}}/js/logs.js"></script>
+    <script>
         setTimeout(() => {
-            window.scrollTo(0, document.body.scrollHeight);
-            console.log("Scrolled to bottom");
-        }, 100);
-
+            update_logs(200, true)
+        }, 500);
+        setInterval(() => {
+            if (live_update_checkbox.checked)
+                update_logs(200, false);
+        }, 2000);
+        live_update = live_update_checkbox.checked;
     </script>
 </body>
 

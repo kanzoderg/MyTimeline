@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <link rel="stylesheet" href="{{ url_base }}/css/testpage.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Test Utilities</h1>
+        
+        <div class="test-section">
+            <div class="controls">
+                <label>
+                    <input type="radio" name="testType" value="bbcode" checked>
+                    BBCode
+                </label>
+                <label>
+                    <input type="radio" name="testType" value="embbed_hyperlink">
+                    Embed Hyperlink
+                </label>
+                <label>
+                    <input type="radio" name="testType" value="tokenize_text">
+                    Tokenize
+                </label>
+                <select id="typeSelect">
+                    <option value="x">X/Twitter</option>
+                    <option value="bsky">Bluesky</option>
+                    <option value="reddit">Reddit</option>
+                    <option value="fa">FurAffinity</option>
+                </select>
+            </div>
+            
+            <textarea id="inputText" placeholder="Enter text to test..."></textarea>
+            
+            <div class="button-group">
+                <button id="testBtn">Test</button>
+                <button id="clearBtn">Clear</button>
+            </div>
+            
+            <div class="loading" id="loading">Processing...</div>
+        </div>
+        
+        <div class="result-section">
+            <span class="result-label">Result:</span>
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const url_base = "{{ url_base }}";
+        const radioButtons = document.querySelectorAll('input[name="testType"]');
+        const typeSelect = document.getElementById('typeSelect');
+        const inputText = document.getElementById('inputText');
+        const testBtn = document.getElementById('testBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const resultDiv = document.getElementById('result');
+        const loadingDiv = document.getElementById('loading');
+
+        // Toggle type select visibility based on radio selection
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'embbed_hyperlink') {
+                    typeSelect.classList.add('visible');
+                } else {
+                    typeSelect.classList.remove('visible');
+                }
+                resultDiv.textContent = '';
+            });
+        });
+
+        // Test button click handler
+        testBtn.addEventListener('click', async function() {
+            const selectedType = document.querySelector('input[name="testType"]:checked').value;
+            const text = inputText.value.trim();
+
+            if (!text) {
+                resultDiv.innerHTML = '<span class="error">Please enter some text to test.</span>';
+                return;
+            }
+
+            loadingDiv.classList.add('active');
+            resultDiv.textContent = '';
+
+            try {
+                const payload = {
+                    test_cat: selectedType,
+                    text: text
+                };
+
+                if (selectedType === 'embbed_hyperlink') {
+                    payload.type = typeSelect.value;
+                }
+
+                const response = await fetch(url_base + '/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                loadingDiv.classList.remove('active');
+
+                if (data.status === 'ok') {
+                    let resultText = '<span class="success">✓ Success</span>\n\n';
+                    
+                    // Format result based on type
+                    if (selectedType === 'tokenize_text' && Array.isArray(data.result)) {
+                        resultText += 'Tokens:\n' + JSON.stringify(data.result, null, 2);
+                    } else {
+                        resultText += escapeHtml(data.result);
+                    }
+                    
+                    resultDiv.innerHTML = resultText;
+                } else {
+                    resultDiv.innerHTML = '<span class="error">✗ Error: ' + escapeHtml(data.message) + '</span>';
+                }
+            } catch (error) {
+                loadingDiv.classList.remove('active');
+                resultDiv.innerHTML = '<span class="error">✗ Request failed: ' + escapeHtml(error.message) + '</span>';
+            }
+        });
+
+        // Clear button click handler
+        clearBtn.addEventListener('click', function() {
+            inputText.value = '';
+            resultDiv.textContent = '';
+            loadingDiv.classList.remove('active');
+        });
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            if (typeof text !== 'string') {
+                text = JSON.stringify(text);
+            }
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Allow Enter key to submit (Ctrl+Enter)
+        inputText.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                testBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+/* ============================================================
+   TESTPAGE.CSS - Shared styles for test.html and upload.html
+   ============================================================ */
+
+/* RESET & BASE STYLES */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #2a2a2a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* CONTAINER */
+.container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    padding: 40px;
+    max-width: 800px;
+    width: 100%;
+}
+
+.container.small {
+    max-width: 600px;
+}
+
+/* HEADINGS */
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 28px;
+}
+
+/* FORM GROUPS & LABELS */
+.form-group {
+    margin-bottom: 25px;
+}
+
+label {
+    font-weight: 600;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* INPUT ELEMENTS */
+input[type="radio"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px dashed #ddd;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 14px;
+}
+
+input[type="file"]:hover {
+    border-color: #667eea;
+    background: #f0f2ff;
+}
+
+input[type="file"]::file-selector-button {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s;
+    margin-right: 10px;
+}
+
+input[type="file"]::file-selector-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+/* SELECT DROPDOWN */
+select {
+    padding: 8px 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #555;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+select:hover {
+    border-color: #667eea;
+}
+
+select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+#typeSelect {
+    display: none;
+}
+
+#typeSelect.visible {
+    display: inline-block;
+}
+
+/* TEXTAREA */
+textarea {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 150px;
+    color: #333;
+    transition: border-color 0.3s;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* BUTTONS */
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+}
+
+button,
+input[type="submit"] {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+/* PRIMARY BUTTON */
+#testBtn,
+input[type="submit"] {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+#testBtn:hover,
+input[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+#testBtn:active,
+input[type="submit"]:active {
+    transform: translateY(0);
+}
+
+/* SECONDARY BUTTON */
+#clearBtn {
+    background: #f0f0f0;
+    color: #555;
+}
+
+#clearBtn:hover {
+    background: #e0e0e0;
+}
+
+/* TEST PAGE SPECIFIC STYLES */
+.test-section {
+    margin-bottom: 30px;
+}
+
+.controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.result-section {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid #eee;
+}
+
+.result-label {
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 12px;
+    display: block;
+}
+
+#result {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    min-height: 100px;
+    color: #333;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.loading {
+    display: none;
+    color: #667eea;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+.loading.active {
+    display: block;
+}
+
+/* STATUS MESSAGES */
+.error {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+.success {
+    color: #27ae60;
+}
+
+/* UPLOAD PAGE SPECIFIC STYLES */
+.post-id-display {
+    background: #f8f9fa;
+    border-left: 4px solid #667eea;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    color: #555;
+}
+
+.post-id-display strong {
+    color: #333;
+}

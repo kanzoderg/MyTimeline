@@ -4,6 +4,8 @@ var float_card = document.getElementById("float_card");
 const alt_text = document.getElementById("alt_text");
 const alt_text_text = document.getElementById("alt_text_text");
 const toast_div = document.getElementById("toast_div");
+const container = document.getElementById("container");
+const container_outer = document.getElementById("container_outer");
 var float_card_on = false;
 
 var toast_timeout = null;
@@ -104,6 +106,9 @@ if (max_page <= 1) {
 }
 
 function next_page() {
+    if (!current_url || current_url.includes("comments/")) {
+        return;
+    }
     new_page = (current_page + 1) % (max_page + 1);
     if (current_q) {
         show_loading_icon();
@@ -117,6 +122,9 @@ function next_page() {
 }
 
 function prev_page() {
+    if (!current_url || current_url.includes("comments/")) {
+        return;
+    }
     if (current_q) {
         show_loading_icon();
     }
@@ -176,6 +184,7 @@ function add_fav(post_id) {
         })
 }
 function scrollToTop() {
+    event.preventDefault();
     window.scrollTo({
         top: 0,
         left: 0,
@@ -201,6 +210,9 @@ function show_float_card(e, card_content_url) {
     fetch(card_content_url)
         .then(response => response.text())
         .then(data => {
+            if (parent && parent.hide_navigation) {
+                parent.hide_navigation();
+            }
             float_card.innerHTML = data;
             float_card.style.display = 'block';
             // clear event listeners on float_card
@@ -231,6 +243,20 @@ function show_float_card(e, card_content_url) {
                     float_card_ui.style.pointerEvents = "none";
                 }, 5000);
             });
+            full_card_media = document.getElementById('float_card_media');
+            if (full_card_media.tagName.toLowerCase() === "img") {
+                full_card_media.addEventListener('load', () => {
+                    full_card_media.style.opacity = 1;
+                });
+                // show media after 1s even if load event not fired, to prevent stuck when load event not fired due to browser issue
+                setTimeout(() => {
+                    full_card_media.style.opacity = 1;
+                }, 1000);
+            }
+            else {
+                full_card_media.style.opacity = 1;
+            };
+
             show_card_wth_timeout();
             float_card_on = true;
             setTimeout(() => {
@@ -240,25 +266,24 @@ function show_float_card(e, card_content_url) {
     e.preventDefault();
 }
 
-// setInterval(() => {
-//     //check if is currently in full screen
-//     if (enter_fullscreen_debounce) {
-//         return;
-//     }
-//     if (!document.webkitIsFullScreen) {
-//         if (float_card_on) {
-//             float_card_on = false;
-//             history.back();
-//         }
-//     }
-// }, 100);
-
 function locationHashChanged() {
     console.log("hash changed", location.hash);
     if (!location.hash) {
+        // find video in float_card and pause it
+        video = float_card.querySelector("video");
+        if (video) {
+            video.pause();
+            video.setAttribute("src", "");
+        }
         float_card.innerHTML = '';
         float_card.style.display = 'none';
         document.body.style.overflowY = 'auto';
+        if (parent && parent.show_navigation) {
+            parent.show_navigation();
+        }
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        }
     }
     if (location.hash != "#alt_text") {
         alt_text.style.display = "none";
@@ -269,7 +294,12 @@ window.onhashchange = locationHashChanged;
 
 function hide_float_card() {
     float_card_on = false;
-    // document.exitFullscreen();
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+    if (parent && parent.show_navigation) {
+        parent.show_navigation();
+    }
     history.back();
 }
 
@@ -353,7 +383,7 @@ function init_img_controls() {
         touch_distance = 0;
         // console.log("pointer up");
         if (media_scale == 1 && !transform_reset_debounce) {
-            swipe_to_next_prev(e, allow_swipe_back = true);
+            swipe_to_next_prev(e, allow_swipe_back = true, allow_next_prev = true);
         }
         if (media_scale < 1) {
             reset_media_transform();
@@ -370,9 +400,6 @@ function init_img_controls() {
     float_card.addEventListener('pointerleave', function (e) {
         is_pointer_down = false;
         touch_distance = 0;
-        if (media_scale == 1 && !transform_reset_debounce) {
-            swipe_to_next_prev(e, allow_swipe_back = false);
-        }
         if (media_scale < 1) {
             reset_media_transform();
         }
@@ -382,7 +409,7 @@ function init_img_controls() {
     });
 }
 
-function swipe_to_next_prev(e, allow_swipe_back = false) {
+function swipe_to_next_prev(e, allow_swipe_back = false, allow_next_prev = true) {
     up_x = e.clientX;
     up_y = e.clientY;
     alpha_x = up_x - down_x;
@@ -391,21 +418,24 @@ function swipe_to_next_prev(e, allow_swipe_back = false) {
     // console.log(alpha_x, alpha_y)
     threshold = 60;
     if (((Math.abs(alpha_x) + 1) / (Math.abs(alpha_y) + 1)) > 1.5) {
-        if (alpha_x > threshold) {
+        if (alpha_x > threshold && allow_next_prev) {
             full_card_prev = document.getElementById("full_card_prev");
+            video_pause = false;
             if (full_card_prev) {
                 full_card_prev.click();
             }
         }
-        else if (alpha_x < -threshold) {
+        else if (alpha_x < -threshold && allow_next_prev) {
             full_card_next = document.getElementById("full_card_next");
+            video_pause = false;
             if (full_card_next) {
                 full_card_next.click();
             }
         }
     }
     else if ((alpha_y > threshold * 1.5 || alpha_y < -threshold * 1.5) && allow_swipe_back) {
-        history.back();
+        video_pause = false;
+        hide_float_card();
     }
 }
 
@@ -461,28 +491,44 @@ function init_video_controls() {
         }
     });
 
+    let time_when_pointer_down = 0;
     float_card.addEventListener('pointerdown', function (e) {
         is_pointer_down = true;
         down_x = e.clientX;
         down_y = e.clientY;
+        time_when_pointer_down = video_.currentTime;
     });
     float_card.addEventListener('pointermove', function (e) {
         if (is_pointer_down) {
             video_.pause()
-            video_.currentTime += e.movementX / 50;
+            move_x = e.clientX - down_x;
+            move_y = e.clientY - down_y;
+            if (Math.abs(move_y) > 10 && Math.abs(move_y) > Math.abs(move_x)) {
+                return;
+            }
+            if (Math.abs(move_x) > 10) {
+                video_.currentTime = time_when_pointer_down + move_x / 50;
+            }
             sync_video_time();
         }
     });
     float_card.addEventListener('touchmove', function (e) {
         if (is_pointer_down) {
             video_.pause()
-            video_.currentTime += e.movementX / 50;
+            move_x = e.touches[0].clientX - down_x;
+            move_y = e.touches[0].clientY - down_y;
+            if (Math.abs(move_y) > 10 && Math.abs(move_y) > Math.abs(move_x)) {
+                return;
+            }
+            if (Math.abs(move_x) > 10) {
+                video_.currentTime = time_when_pointer_down + move_x / 50;
+            }
             sync_video_time();
         }
     });
     float_card.addEventListener('pointerup', function (e) {
         is_pointer_down = false;
-        swipe_to_next_prev(e, allow_swipe_back = true);
+        swipe_to_next_prev(e, allow_swipe_back = true, allow_next_prev = false);
         up_x = e.clientX;
         up_y = e.clientY;
         if (Math.abs(up_x - down_x) < 5 && Math.abs(up_y - down_y) < 5) {
@@ -490,9 +536,13 @@ function init_video_controls() {
         }
         if (!video_pause)
             video_.play();
+        video_pause = false;
     });
     float_card.addEventListener('pointerleave', function (e) {
         is_pointer_down = false;
+        if (!video_pause && float_card_on)
+            video_.play();
+        video_pause = false;
     });
 }
 
@@ -554,13 +604,23 @@ function enter_fullscreen() {
     }
 }
 
+function viewer_enter_fullscreen() {
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+    else {
+        float_card.requestFullscreen();
+    }
+
+}
+
 function show_search_history() {
     const search_float = document.getElementById("search_float");
     const search_history_list = document.getElementById("search_history_list");
     search_float.style.display = "block";
     search_float.style.opacity = 1;
     //load search history from localstorage
-    history_list = JSON.parse(localStorage.getItem("search_history")) || ["@fa", "@reddit", "@x", "@bsky"];
+    history_list = JSON.parse(localStorage.getItem("search_history")) || ["@fa", "@reddit", "@x", "@bsky", "@patreon", "mode:full"];
     search_history_list.innerHTML = "";
     history_list.forEach(item => {
         const div = document.createElement("div");
@@ -576,7 +636,7 @@ function show_search_history() {
 }
 
 function add_search_history_item(item) {
-    history_list = JSON.parse(localStorage.getItem("search_history")) || ["@fa", "@reddit", "@x", "@bsky"];
+    history_list = JSON.parse(localStorage.getItem("search_history")) || ["@fa", "@reddit", "@x", "@bsky", "@patreon", "mode:full"];
     //add to history if not exists
     item = decodeURIComponent(item);
     if (!history_list.includes(item)) {
@@ -680,6 +740,8 @@ function select_user(uid) {
     if (select_users.length == 0) {
         group_btn.style.display = "none";
     }
+    // prevent event from bubbling up to user card
+    event.stopPropagation();
 }
 
 function group_users() {
@@ -759,6 +821,7 @@ function show_alt(id) {
     alt_text_text.innerText = alt_text_data;
     alt_text.style.display = "block";
     location.hash = "alt_text";
+    document.body.style.overflowY = 'hidden';
     event.stopPropagation();
 }
 
@@ -839,23 +902,6 @@ function url_input() {
     document.getElementById('url_input').value = "";
 }
 
-function update_logs(line = 20, to_bottom = false) {
-    const logs_div = document.getElementById('logs')
-    fetch(url_base + '/api/logs', {
-        method: 'GET'
-    }).then(response => response.json())
-        .then(data => {
-            if (data.status == 'ok') {
-                logs_div.innerHTML = ''
-                data.logs.forEach(function (item, index) {
-                    logs_div.innerHTML += '<div class=\'log-entry ' + item[0] + '\'>' + item[1] + '</div>';
-                });
-                if (to_bottom)
-                    logs_div.scrollTo(0, logs_div.scrollHeight);
-            }
-        })
-}
-
 function upload_cookies(type_name) {
     const file_input = document.createElement('input');
     file_input.type = 'file';
@@ -884,7 +930,7 @@ icon_usernames.forEach(icon => {
 });
 
 function isOverflown(element) {
-    return element.scrollHeight > element.clientHeight;
+    return element.scrollHeight > element.clientHeight + 10;
 }
 
 const card_body_texts = document.querySelectorAll('.card_body_text');
@@ -924,4 +970,95 @@ if (user_body_text) {
 }
 
 
+function show_content_in_frame(e, element, window = 2) {
+    const url = element.getAttribute('href');
+    if (parent.show_content) {
+        e.preventDefault();
+        parent.show_content(url, window);
+    }
+}
+
 hide_loading_icon();
+
+if (parent && parent.show_navigation) {
+    parent.show_navigation();
+}
+
+// swipe left and right to go to next/prev page on mobile
+var touch_start_x = 0;
+var touch_end_x = 0;
+var touch_start_y = 0;
+var touch_end_y = 0;
+
+container_outer.addEventListener('touchstart', function (e) {
+    touch_start_x = e.changedTouches[0].screenX;
+    touch_start_y = e.changedTouches[0].screenY;
+}, false);
+
+container_outer.addEventListener('touchend', function (e) {
+    touch_end_x = e.changedTouches[0].screenX;
+    touch_end_y = e.changedTouches[0].screenY;
+    handle_gesture();
+}, false);
+
+threshold = 60;
+
+function handle_gesture() {
+    if (Math.abs(touch_end_y - touch_start_y) > threshold) {
+        return;
+    }
+    if (touch_end_x < touch_start_x - threshold) {
+        next_page();
+    }
+    if (touch_end_x > touch_start_x + threshold) {
+        prev_page();
+    }
+}
+
+function get_sibling_height(id_) {
+    currentElement = document.getElementById(id_);
+    previousElement = currentElement.previousElementSibling;
+    if (previousElement.classList.contains('card_highlighted'))
+        return 0;
+    height = 0;
+    // check if the id matches
+    if (
+        previousElement &&
+        previousElement.getAttribute('data-post-id') == currentElement.getAttribute('data-reply-to-id')
+    ) {
+        height = previousElement.offsetHeight;
+    }
+    return height
+}
+
+function set_reply_deco(ele) {
+    id_ = ele.getAttribute('id')
+    if (!id_)
+        return;
+    deco = ele.querySelector('.reply_deco')
+    if (!deco) {
+        deco = document.createElement("div");
+        deco.classList.add('reply_deco');
+        ele.append(deco);
+    }
+    sibling_height = get_sibling_height(id_);
+    if (!sibling_height)
+        return;
+    deco.style.height = 'calc(' + sibling_height + 'px - 3.9rem)';
+}
+
+function set_all_reply_decos() {
+    console.log('set_all_reply_decos()')
+    document.querySelectorAll('.post_reply').forEach((e, n) => {
+        set_reply_deco(e)
+    })
+    document.querySelectorAll('.reply_deco').forEach((e, n) => {
+        e.style.opacity = 1;
+    })
+}
+
+window.onload = () => {
+    set_all_reply_decos();
+}
+
+window.addEventListener('resize', set_all_reply_decos);

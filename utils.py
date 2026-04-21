@@ -1,5 +1,5 @@
 from PIL import Image
-import time, os, re, sys, json
+import time, os, re, sys, json, math
 import traceback
 import subprocess
 import signal, psutil
@@ -9,6 +9,7 @@ import requests
 from random import randint
 from uuid import uuid4
 from bs4 import BeautifulSoup
+from html import escape
 
 from flask import request
 
@@ -30,6 +31,16 @@ def strip_suffix(text, suffix):
     while text.endswith(suffix):
         text = text[: -len(suffix)]
     return text
+
+
+def remove_duplicate_with_order(l: list):
+    seen = set()
+    result = []
+    for item in l:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
 
 
 def strip_suffix_list(text, suffixes):
@@ -67,6 +78,7 @@ if os.path.exists("tmp/ua.txt"):
             global_headers["User-Agent"] = ua
             logger.log(f"Loaded User-Agent from file: {global_headers['User-Agent']}")
 
+
 def copy_ua_from_request():
     global global_headers
     if request and request.headers.get("User-Agent"):
@@ -94,6 +106,9 @@ IMAGE = 2
 AUDIO = 3
 FLASH = 4
 TEXT = 5
+ARCHIVE = 6
+PROJECT_SOURCE = 7
+PLAIN_TEXT = 8
 
 TYPE_DOWNLOAD = 0
 TYPE_RESCAN = 1
@@ -109,11 +124,26 @@ def media_type_from_extension(extension):
         return AUDIO
     elif extension in ["swf", "flv"]:
         return FLASH
-    elif extension in ["txt", "md", "html", "htm", "pdf", "doc", "docx"]:
+    elif extension in ["html", "htm", "pdf", "doc", "docx"]:
         return TEXT
+    elif extension in ["txt", "md"]:
+        return PLAIN_TEXT
+    elif extension in ["zip", "rar", "7z", "tar", "bz2", "001", "002", "003"]:
+        return ARCHIVE
+    elif extension in ["psd", "blend", "clip"]:
+        return PROJECT_SOURCE
     else:
         return UNKNOWN
 
+
+exclude_files = [
+    "thumbs.db",
+    ".ds_store",
+    "user.json",
+    "about.json",
+    "user.json.gz",
+    "about.json.gz",
+]
 
 allowed_to_proxy = [
     "furaffinity.net/",
@@ -121,6 +151,7 @@ allowed_to_proxy = [
     "fanbox.cc",
     "pixiv",
     "itch.",
+    # "patreon.com",
 ]
 
 allowed_to_probe = [
@@ -129,9 +160,17 @@ allowed_to_probe = [
     "fanbox.cc",
     "pixiv",
     "itch.io",
+    # "patreon.com",
 ]
 
-allowed_to_embed = ["furaffinity.net/view/", "furaffinity.net/journal/", "at://"]
+allowed_to_embed = [
+    "furaffinity.net/view/",
+    "furaffinity.net/journal/",
+    "at://",
+    "x.com/",
+    "twitter.com/",
+    "bsky.app/profile/",
+]
 
 
 def check_allowed_to_proxy(url):
@@ -169,7 +208,7 @@ def get_role(session_key, super_secret_key=None):
         return ROLE_ADMIN
     if session_key in auth_pool:
         # Check if session is expired
-        if time.time() - auth_pool[session_key][0] > 24 * 3600:
+        if time.time() - auth_pool[session_key][0] > 7 * 24 * 3600:
             del auth_pool[session_key]
             return ROLE_UNAUTHORIZED
         return auth_pool[session_key][1]
@@ -215,6 +254,7 @@ def select_cookies_for_url(url):
 
 
 def get(url, headers=None):
+    logger.log(f"GET -> {url}", type="attention")
     comblined_headers = global_headers.copy()
     if headers:
         comblined_headers.update(headers)
@@ -238,6 +278,7 @@ def get(url, headers=None):
 
 
 def post(url, json=None, headers=None):
+    logger.log(f"POST -> {url}", type="attention")
     comblined_headers = global_headers.copy()
     if headers:
         comblined_headers.update(headers)
@@ -374,7 +415,13 @@ class DownloadWorker(Thread):
                     cmd = [os.path.expanduser(config.custom_gallery_dl_location)]
                 else:
                     cmd = ["gallery-dl"]
-                if "bsky" in current_url:
+                if re.match(r"[a-zA-Z0-9_.-]+@[a-zA-Z]+", current_url):
+                    # This is a rescan job
+                    name, type = current_url.split("@")
+                    cmd = []
+                    user_fs_path = f"{config.fs_bases[type]}/{name}/"
+                    job_type = TYPE_RESCAN
+                elif "bsky" in current_url:
                     # cookies not avalible yet
                     name = re.search(r"profile/([a-zA-Z0-9\-\_\.]+)", current_url)
                     if not name:
@@ -467,7 +514,38 @@ class DownloadWorker(Thread):
                         f"\"{global_headers['User-Agent']}\"",
                         current_url,
                     ]
+                    if full:
+                        cmd += ["-f"]
                     type = "fa"
+                elif "patreon.com" in current_url:
+                    current_url = current_url.strip("/")
+                    name = current_url.split("/")[-1].lower()
+                    user_fs_path = os.path.expanduser(
+                        f"{config.fs_bases['patreon']}/{name}/"
+                    )
+                    cmd = ["echo not supported yet"]
+                    job_type = TYPE_RESCAN
+                    type = "patreon"
+                elif ("kemono." in current_url) or ("coomer." in current_url):
+                    current_url = current_url.split("?")[0].strip("/")
+                    if "kemono." in current_url:
+                        name = "ignore"
+                    elif "coomer." in current_url:
+                        name = re.search(r"user/([\w\d_\-\.]+)", current_url)
+                        if not name:
+                            name = "ignore"
+                        else:
+                            name = name.group(1).lower()
+                    user_fs_path = os.path.expanduser(f"{config.fs_bases['patreon']}")
+                    cmd = [
+                        config.current_python,
+                        "kemonodl",
+                        "--target-dir",
+                        user_fs_path,
+                        current_url,
+                        "--no-interactive",
+                    ]
+                    type = "patreon"
                 else:
                     logger.log("Unsupported URL:", current_url)
                     continue
@@ -511,6 +589,7 @@ class DownloadWorker(Thread):
                         triggers=[
                             ("NotFoundError", trigger_action),
                             ("AuthorizationError", trigger_action),
+                            ("AccountTakedown", trigger_action),
                         ],
                     )
                 else:
@@ -604,6 +683,26 @@ def render_markdown(text_content):
     return text_content
 
 
+def render_bbcode(text_content):
+    # simple bbcode rendering
+    text_content = text_content.replace("[b]", "<b>").replace("[/b]", "</b>")
+    text_content = text_content.replace("[i]", "<i>").replace("[/i]", "</i>")
+    text_content = text_content.replace("[u]", "<u>").replace("[/u]", "</u>")
+    text_content = text_content.replace("[h1]", "<h1>").replace("[/h1]", "</h1>")
+    text_content = text_content.replace("[h2]", "<h2>").replace("[/h2]", "</h2>")
+    text_content = text_content.replace("[h3]", "<h3>").replace("[/h3]", "</h3>")
+    text_content = text_content.replace("[hr]", "<hr>")
+    text_content = text_content.replace("[sub]", "<sub>").replace("[/sub]", "</sub>")
+    text_content = text_content.replace(
+        "[center]", '<div style="text-align:center">'
+    ).replace("[/center]", "</div>")
+
+    text_content = re.sub(r"\[color\=#?([0-9a-fA-F]{3,8})\]", r'<span style="color:#\1">', text_content)
+    text_content = text_content.replace("[/color]", "</span>")
+
+    return text_content
+
+
 cache_embeded_link = {}
 
 
@@ -612,6 +711,12 @@ def shorten_url(url, max_length=40):
         return url
     return url[:35] + "..."
 
+def tokenize_text(text):
+    tokens = re.split(
+        r"([:：；<>,，。→【】\[\]'\"‘’“”《》~!\s\n\(\)]|[^\x00-\x7F]+)", text
+    )
+    tokens = [token for token in tokens if token]
+    return tokens
 
 def embed_hyperlink(type, text_content_in):
     global cache_embeded_link
@@ -629,10 +734,8 @@ def embed_hyperlink(type, text_content_in):
             .replace("＃", "#")
             .replace("＠", "@")
         )
-        tokens = re.split(
-            r"([:;<>,，。→【】\[\]'\"!\s\n\(\)]|[^\x00-\x7F]+)", text_content
-        )
-        tokens = [token for token in tokens if token]
+        text_content = escape(text_content)
+        tokens = tokenize_text(text_content)
         # logger.log(tokens)
         for i, token in enumerate(tokens):
             try:
@@ -659,6 +762,7 @@ def embed_hyperlink(type, text_content_in):
                 if token == "\n":
                     tokens[i] = "<br>"
                 elif token.startswith("@") and len(token) > 1:
+                    # user mentions
                     token = token.rstrip(".")
                     token = token.replace("/", "").replace("\\", "")
                     if "." in token:
@@ -669,11 +773,16 @@ def embed_hyperlink(type, text_content_in):
                         f'<a class="hyperlink iconusername" href="{config.url_base}/user/{type}/{token[1:]}">{token}</a>'
                     )
                 elif token.startswith("#") and len(token) > 2:
+                    if len(token) > 30:
+                        tokens[i] = token
+                        continue
+                    # hashtags
                     tokens[i] = tokens[i].rsplit(".")
                     tokens[i] = (
                         f'<a class="hyperlink hashtag" onclick="show_loading_icon()" href="{config.url_base}/tl?q={token[1:]}">{token}</a>'
                     )
                 elif token.endswith(".bsky.social") and len(token) > 11:
+                    # bsky profile links
                     token = token.split("/")[-1]
                     tokens[i] = (
                         f'<a class="hyperlink iconusername" href="{config.url_base}/user/bsky/{token}">@{token}</a>'
@@ -681,11 +790,13 @@ def embed_hyperlink(type, text_content_in):
                 elif token.startswith("www.furaffinity.net/user/") or token.startswith(
                     "furaffinity.net/user/"
                 ):
+                    # fa profile links
                     umatch = token.strip("/").split("/")[-1]
                     tokens[i] = (
                         f'<a class="hyperlink iconusername" href="{config.url_base}/user/fa/{umatch}">~{umatch}</a>'
                     )
                 elif "." in token:
+                    # other links
                     if token[0] == "." or token[-1] == ".":
                         continue
                     if ".." in token:
@@ -702,6 +813,7 @@ def embed_hyperlink(type, text_content_in):
                     ):  # check if last part is not all numbers
                         continue
                     if "@" in token and not "/" in token:
+                        # email address
                         tokens[i] = (
                             f'<a class="hyperlink email" href="mailto:{token}" target="_blank">{token}</a>'
                         )
@@ -714,11 +826,22 @@ def embed_hyperlink(type, text_content_in):
                             r"twitter.com/([a-zA-Z0-9\-\_\.]+)", token
                         ) or re.match(r"x.com/([a-zA-Z0-9\-\_\.]+)", token)
                         if uname_match:
-                            token = uname_match.group(1)
-                            tokens[i] = (
-                                f'<a class="hyperlink iconusername" href="{config.url_base}/user/x/{token}">@{token}</a>'
-                            )
-                            continue
+                            # Handle case where token is a full tweet URL
+                            if "/status/" in token:
+                                token = token.split("?")[0]
+                                token = f"x.com/{uname_match.group(1)}/status/{token.split('/')[3]}"
+                                logger.log(
+                                    "Embedded tweet link:",
+                                    tokens[i],
+                                    type="attention",
+                                    verbose=3,
+                                )
+                            else:
+                                token = uname_match.group(1)
+                                tokens[i] = (
+                                    f'<a class="hyperlink iconusername" href="{config.url_base}/user/x/{token}">@{token}</a>'
+                                )
+                                continue
                         if check_allowed_to_embed(token) or check_allowed_to_probe(
                             token
                         ):
@@ -733,9 +856,28 @@ def embed_hyperlink(type, text_content_in):
                 )
         text_content = "".join(tokens)
     elif type == "reddit":
+        # fa urls
+        fa_url_match = re.search(
+            r"furaffinity\.net/(view|journal)/\d+", text_content_in
+        )
+        if fa_url_match:
+            display_link = fa_url_match.group(0)
+        # bsky urls
+        bsky_url_match = re.search(
+            r"bsky\.app/profile/[a-zA-Z0-9\-\_\.\:]+/post/[a-zA-Z0-9]+", text_content_in
+        )
+        if bsky_url_match:
+            display_link = bsky_url_match.group(0)
+        # x urls
+        x_url_match = re.search(
+            r"x\.com/[a-zA-Z0-9\-\_\.]+/status/[\d]+", text_content_in
+        )
+        if x_url_match:
+            display_link = x_url_match.group(0)
         text_content = render_markdown(text_content_in)
-    elif type == "fa":
-        soup = BeautifulSoup(text_content_in, "html.parser")
+    elif type in ["fa", "patreon"]:
+        text_content = text_content_in.replace("\n", "")
+        soup = BeautifulSoup(text_content, "html.parser")
         for a in soup.find_all("a", href=True):
             href = a["href"]
             href = href.replace("http://", "").replace("https://", "")
@@ -744,7 +886,7 @@ def embed_hyperlink(type, text_content_in):
                 a["href"] = f"{config.url_base}/user/fa/{umatch}"
             elif (
                 ("twitter.com/" in href)
-                or ("x.com/" in href)
+                or ("/x.com/" in href)
                 or ("bsky.app/profile/" in href)
             ):
                 uname_match = (
@@ -753,6 +895,8 @@ def embed_hyperlink(type, text_content_in):
                     or re.search(r"bsky.app/profile/([a-zA-Z0-9\-\_\.]+)", href)
                 )
                 if uname_match:
+                    href = href.split("?")[0]
+                    href = re.sub(r"/(photo|video)/\d+", "", href)
                     token = uname_match.group(1)
                     if "bsky.app/profile/" in href:
                         a["href"] = f"{config.url_base}/user/bsky/{token}"
@@ -760,31 +904,29 @@ def embed_hyperlink(type, text_content_in):
                         a["href"] = f"{config.url_base}/user/x/{token}"
                     a.string = "@" + token
                     a["class"] = ["hyperlink", "iconusername"]
+                    a["target"] = "_self"
             else:
                 a["target"] = "_blank"
+                a["class"] = ["auto_link", "external"]
             if check_allowed_to_embed(href) or check_allowed_to_probe(href):
                 display_link = href
         for img in soup.find_all("img", src=True):
             src = img["src"]
             src = src.replace("http://", "").replace("https://", "").lstrip("/")
-            # if src.startswith("a.furaffinity.net/"):
-            #     img["src"] = (
-            #         config.url_base
-            #         + "/cache_proxy/a.furaffinity.net/"
-            #         + src.split("/")[-1]
-            #     )
-            # elif src.startswith("d.furaffinity.net/"):
-            #     img["src"] = (
-            #         config.url_base
-            #         + "/cache_proxy/d.furaffinity.net/"
-            #         + src.split("/")[-1]
-            #     )
-            if re.match(r'[a-z]\.furaffinity\.net/', src):
-                img["src"] = (
-                    config.url_base
-                    + "/cache_proxy/"
-                    + src
-                )
+            if re.match(r"[a-z]\.furaffinity\.net/", src):
+                img["src"] = config.url_base + "/cache_proxy/" + src
+            elif type == "patreon":
+                img["src"] = ""
+        for youtubeWrapper in soup.find_all(class_="youtubeWrapper"):
+            youtubeIframe = youtubeWrapper.find("iframe")
+            if youtubeIframe and youtubeIframe.has_attr("src"):
+                src = youtubeIframe["src"]
+                youtubeID = re.search(r"/embed/([a-zA-Z0-9\-\_]+)", src)
+                if youtubeID:
+                    youtubeID = youtubeID.group(1)
+                    youtube_url = f"https://www.youtube.com/watch?v={youtubeID}"
+                    display_link = youtube_url
+            youtubeWrapper.attrs["style"] = "display:none;"
         text_content = str(soup)
         text_content = strip_suffix_list(
             text_content, ["<br>", "\n", "<br/>", "<br />", "</br>", "</h"]
@@ -878,3 +1020,50 @@ def probe_url(url):
     except:
         logger.log(traceback.format_exc(), type="error")
     return title, description, thumbnail
+
+
+def probe_video_duration(video_path):
+    try:
+        cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            f'"{video_path}"',
+        ]
+        cmd = [str(x) for x in cmd]
+        result = subprocess.check_output(" ".join(cmd), shell=True)
+        print("ffprobe result:", result)
+        duration = float(result.strip())
+        return duration
+    except Exception as e:
+        logger.log(
+            f"Error probing video duration: {traceback.format_exc()}", type="error"
+        )
+        return 0
+
+
+def format_duration(seconds):
+    if not seconds:
+        return "00:00"
+    try:
+        seconds = int(seconds)
+        minutes = seconds // 60
+        secs = seconds % 60
+        return f"{minutes:02d}:{secs:02d}"
+    except Exception as e:
+        logger.log(f"Error formatting duration: {traceback.format_exc()}", type="error")
+        return "00:00"
+
+def format_size(size_bytes):
+    if size_bytes == 0:
+        return "0B"
+    size_name = ("B", "KB", "MB", "GB", "TB")
+    if size_bytes < 0:
+        return "Invalid size"
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    return f"{round(size_bytes / p, 2)} {size_name[i]}"

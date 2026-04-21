@@ -5,6 +5,7 @@
     <meta charset="UTF-8" />
     <title>{{title}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
     <link rel="stylesheet" href="{{url_base}}/css/style.css" />
     <style>
         #pin_code_input {
@@ -47,7 +48,7 @@
                 body: JSON.stringify({ pin: pinCode })
             }).then(response => response.json()).then(data => {
                 if (data.status === "ok") {
-                    location.replace(`${urlBase}/userlist`);
+                    location.replace(`${urlBase}/`);
                 } else {
                     alert(data.message);
                 }

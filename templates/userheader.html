@@ -1,10 +1,10 @@
 <div class="user_header_full">
-    <a href="{{url_base}}/banner/{{user.type}}/{{user.user_name}}?redownload=1">
+    <a href="{{url_base}}/banner/{{user.type}}/{{user.user_name}}?redownload=1" target="_blank">
         <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_header_banner" />
     </a>
     <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" id="background_banner" />
     <div class="user_header">
-        <a href="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}?redownload=1">
+        <a href="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}?redownload=1" target="_blank">
             <img class="user_header_img" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
         </a>
         <div class="user_header_txt">
@@ -16,12 +16,29 @@
             {% elif user.type == 'fa' %}
             <div class="user_header_title">{{user.nick}}</div>
             <div class="user_header_date">~ {{user.user_name}}</div>
+            {% elif user.type == 'patreon' %}
+            <div class="user_header_title">{{user.nick}}</div>
+            <div class="user_header_date">on patreon</div>
             {% endif %}
         </div>
         <div style="margin: 0.5rem; font-size: 0.9rem; margin-left: 0.9rem;">{{posts_cnt}} <span
                 style="opacity: 0.6;">Posts</span></div>
         <div class="user_body_text">
             {{user.description | safe}}
+        </div>
+        <div class="user_header_extra">
+            {% if user.extra_data.get('location') %}
+            <div class="extra_item">
+                <img src="{{url_base}}/img/location.svg" />
+                {{user.extra_data.get('location')}}
+            </div>
+            {% endif %}
+            {% if user.extra_data.get('url') %}
+            <a class="extra_item" href="https://{{user.extra_data.get('url')}}" target="_blank">
+                <img src="{{url_base}}/img/link.svg" />
+                {{user.extra_data.get('url')}}
+            </a>
+            {% endif %}
         </div>
         <a class="user_header_button" onclick="toggle_user_context_menu()" style="right: 3.5rem;">
             <img src="{{url_base}}/img/3dots.svg" />
@@ -41,6 +58,13 @@
         {% elif user.type == 'fa' %}
         <a class="user_header_button" href="https://www.furaffinity.net/user/{{user.user_name}}" target="_blank">
             <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);" />
+        </a>
+        {% elif user.type == 'patreon' %}
+        <a class="user_header_button" href="{{user.url}}" target="_blank">
+            <img src="{{url_base}}/img/patreon.svg" style="transform: scale(1.2);" />
+        </a>
+        <a class="user_header_button" href="{{user.extra_data.get('party_url', '')}}" target="_blank" style="top: 3rem">
+            <img src="{{url_base}}/img/fox.svg" style="transform: scale(1);" />
         </a>
         {% endif %}
         <div class="user_header_update_time">
@@ -63,7 +87,7 @@
                     class="inline_icon" /> Flag User</a>
             <a class="context_item" onclick="unflag_user('{{user.uid}}')"><img src="{{url_base}}/img/unflag.svg"
                     class="inline_icon" /> Unflag User</a>
-            <a class="context_item" onclick="add_rescan('{{user.url}}')"><img src="{{url_base}}/img/scan.svg"
+            <a class="context_item" onclick="add_rescan('{{user.uid}}')"><img src="{{url_base}}/img/scan.svg"
                     class="inline_icon" /> Scan</a>
         </div>
         <div id="user_context_menu_background" class="context_menu_background" onclick="toggle_user_context_menu()">

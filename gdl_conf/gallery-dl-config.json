@@ -49,7 +49,8 @@
                     "event": "post",
                     "filename": "{id}.json"
                 }
-            ]
+            ],
+            "videos": "ytdl"
         },
         "reddit>redgifs": {
             "filename": "{_reddit[id]}_{id}_{num}.{extension}"

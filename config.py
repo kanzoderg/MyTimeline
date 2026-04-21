@@ -20,17 +20,23 @@ super_session_key = None
 log_file = None
 user_pin_hased = None
 admin_pin_hased = None
+allow_external_url_preview = False
 
 config_read = False
 
 current_python = sys.executable
 if not os.path.exists(current_python):
-    print(f"Warning: current python executable {current_python} does not exist, how??? Using fallback 'python' command, hope it works...")
+    print(
+        f"Warning: current python executable {current_python} does not exist, how??? Using fallback 'python' command, hope it works..."
+    )
     current_python = "python"
 print("Using python interpreter:", current_python)
 
+kemono_proxy = "kemono.cr"
+coomer_proxy = "coomer.st"
+
 def read_config(filename="config.json"):
-    global host, port, url_base, cookies_list, auth_files, fs_bases, cache_path, thumbnail_size, custom_gallery_dl_location, items_per_page, proxy, no_auth, user_pin, admin_pin, super_session_key, log_file, user_pin_hased, admin_pin_hased, config_read, current_python
+    global host, port, url_base, cookies_list, auth_files, fs_bases, cache_path, thumbnail_size, custom_gallery_dl_location, items_per_page, proxy, no_auth, user_pin, admin_pin, super_session_key, log_file, user_pin_hased, admin_pin_hased, config_read, current_python, allow_external_url_preview
     if os.path.exists(filename):
         with open(filename, "r") as f:
             _config_data = json.load(f)
@@ -55,18 +61,24 @@ def read_config(filename="config.json"):
     fs_bases = _config_data.get(
         "fs_bases",
         {
-            "x": "./twitter",
-            "bsky": "./bluesky",
-            "reddit": "./reddit",
-            "fa": "./furaffinity",
+            "x": "./downloads/twitter",
+            "bsky": "./downloads/bluesky",
+            "reddit": "./downloads/reddit",
+            "fa": "./downloads/furaffinity",
+            "patreon": "./downloads/patreon",
         },
     )
     cache_path = _config_data.get("cache_path", "~/.cache/mt")
 
-    fs_bases["x"] = os.path.expanduser(fs_bases["x"])
-    fs_bases["bsky"] = os.path.expanduser(fs_bases["bsky"])
-    fs_bases["reddit"] = os.path.expanduser(fs_bases["reddit"])
-    fs_bases["fa"] = os.path.expanduser(fs_bases["fa"])
+    fs_bases["x"] = os.path.expanduser(fs_bases.get("x", "./downloads/twitter"))
+    fs_bases["bsky"] = os.path.expanduser(fs_bases.get("bsky", "./downloads/bluesky"))
+    fs_bases["reddit"] = os.path.expanduser(
+        fs_bases.get("reddit", "./downloads/reddit")
+    )
+    fs_bases["fa"] = os.path.expanduser(fs_bases.get("fa", "./downloads/furaffinity"))
+    fs_bases["patreon"] = os.path.expanduser(
+        fs_bases.get("patreon", "./downloads/patreon")
+    )
     cache_path = os.path.expanduser(cache_path)
 
     # create base directories if not exist
@@ -75,7 +87,6 @@ def read_config(filename="config.json"):
             os.makedirs(base_path)
     os.makedirs(cache_path, exist_ok=True)
     os.makedirs("tmp", exist_ok=True)
-
 
     thumbnail_size = _config_data.get("thumbnail_size", 600)
 
@@ -102,7 +113,7 @@ def read_config(filename="config.json"):
             "Warning: user_pin is set but admin_pin is not set, using user_pin as admin_pin."
         )
         admin_pin = user_pin
-    if not(user_pin or admin_pin):
+    if not (user_pin or admin_pin):
         print(
             "Warning: No user_pin or admin_pin set, authentication will be effectively disabled."
         )
@@ -113,4 +124,5 @@ def read_config(filename="config.json"):
     super_session_key = _config_data.get("super_session_key", "")
 
     log_file = _config_data.get("log_file", "./log.txt")
+    allow_external_url_preview = bool(_config_data.get("allow_external_url_preview", False))
     config_read = True

@@ -1,0 +1,21 @@
+<div class="card_footer">
+    <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+        <img src="{{url_base}}/img/like.svg" />
+        <span>{{post.likes}}</span>
+    </a>
+    <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+        <img src="{{url_base}}/img/comment.svg" />
+        <span>{{post.comments}}</span>
+    </a>
+    <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+        <img src="{{url_base}}/img/repost.svg" />
+        <span>{{post.reposts}}</span>
+    </a>
+    <a class="card_footer_item" onclick="add_fav('{{post.post_id}}')">
+        {% if post.fav %}
+        <img src="{{url_base}}/img/bookmark.svg" class="p{{post.post_id}}_fav" />
+        {% else %}
+        <img src="{{url_base}}/img/bookmark_empty.svg" class="p{{post.post_id}}_fav" />
+        {% endif %}
+    </a>
+</div>

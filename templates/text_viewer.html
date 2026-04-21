@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>{{title}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/style.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/text.css" />
+</head>
+
+<body>
+    <div class="text_viewer">
+        <div class="text_container">{{content|safe}}</div>
+    </div>
+
+    <a onclick="history.back()" class="float_btn translucent" style="top: 1rem; left: 1rem;">
+        <img src="{{url_base}}/img/cross.svg" style="transform: scale(0.8);">
+    </a>
+    <a href="{{download_url}}" class="float_btn translucent" style="top: 1rem; right: 1rem;" target="_blank">
+        <img src="{{url_base}}/img/download.svg" style="transform: scale(0.6);">
+    </a>
+    <script src="{{url_base}}/js/text.js"></script>
+</body>

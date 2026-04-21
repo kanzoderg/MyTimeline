@@ -30,8 +30,8 @@
 </head>
 <body>
     <div class="busy-message">
-        <p>Indexing in progress...</p>
-        <p>Please wait, this may take a while.</p>
+        <p>{{message}}</p>
+        <p>This page will refresh automatically.</p>
     </div>
     <div id="back_btn" onclick="window.location.href='{{url_base}}/userlist'">
         <img src="{{url_base}}/img/left.svg">
@@ -39,8 +39,7 @@
     <script>
         setInterval(() => {
             location.reload();
-        }, 5000); // Refresh every 5 seconds
+        }, 5000);
     </script>
-    <script src="{{url_base}}/js/noreferer.js"></script>
 </body>
 </html>

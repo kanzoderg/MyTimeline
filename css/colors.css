@@ -1,0 +1,16 @@
+body {
+    --text-color: #ffffff;
+    --text-color-alt: #ffffffaa;
+    --accent-color: rgb(255, 0, 111);
+    --accent-color-dark: rgb(126, 0, 57);
+    --accent-color-light: rgb(43, 188, 255);
+    --internal-link-color: rgb(68, 174, 255);
+    --external-link-color: rgb(255, 150, 70);
+    --bg-color: #000000;
+    --bg-with-alpha: rgba(0, 0, 0, 0.3);
+    --bg-with-alpha-hover-dark: rgba(0, 0, 0, 0.5);
+    --bg-with-alpha-hover-light: rgba(255, 255, 255, 0.06);
+    --bg-light: rgba(255, 255, 255, 0.2);
+    --border-color: #fff3;
+    --border-color-dark: #0003;
+}

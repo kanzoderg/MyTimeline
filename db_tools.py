@@ -53,6 +53,27 @@ def remove_legacy_json():
                     os.remove(legacy_file)
         if os.path.exists(os.path.join(folder_path, "info.json")):
             os.remove(os.path.join(folder_path, "info.json"))
+    for folder in os.listdir(config.fs_bases["patreon"]):
+        folder_path = os.path.join(config.fs_bases["patreon"], folder)
+        if not os.path.isdir(folder_path):
+            continue
+        for file in os.listdir(folder_path):
+            match = re.search(r"(\d+)_", file)
+            if match and file.endswith(".json"):
+                legacy_file = os.path.join(folder_path, file)
+                new_json = f"{match.group(1)}.json"
+                new_file = os.path.join(folder_path, new_json)
+                if os.path.exists(new_file) and new_file != legacy_file:
+                    print(
+                        "File already exists: "
+                        + new_json
+                        + " so safe to remove "
+                        + file
+                    )
+                    print(legacy_file + " -> " + new_file)
+                    os.remove(legacy_file)
+        if os.path.exists(os.path.join(folder_path, "info.json")):
+            os.remove(os.path.join(folder_path, "info.json"))
 
 
 def drop_table_users():
@@ -72,6 +93,7 @@ duplicated_users = []
 def sanity_check():
     global missing_users, duplicated_users
     suggestions = set()
+    duplicated_users = set()
     print("Starting sanity check...")
     conn = sqlite3.connect(sqlite_file)
     cursor = conn.cursor()
@@ -114,9 +136,9 @@ def sanity_check():
             continue
         for file in os.listdir(user_fs_base):
             if file in files_list:
-                files_list[file].append(user)
+                files_list[file].append(uid)
             else:
-                files_list[file] = [user]
+                files_list[file] = [uid]
     for file, users_with_file in files_list.items():
         if file in [
             "info.json",
@@ -126,6 +148,7 @@ def sanity_check():
             "banner_bck",
             "user.json",
             "extend.txt",
+            "profile.json"
         ]:
             continue
         if not file.split(".")[-1] in [
@@ -145,10 +168,17 @@ def sanity_check():
             continue
         if len(users_with_file) > 1:
             # print(f"File {file} is shared by {users_with_file}")
-            suggestions.add(
-                f"{' '.join(users_with_file)} may be the same user. Try user_rename(). Overlapping file: {file}"
-            )
-            duplicated_users.append(tuple(users_with_file))
+            if not tuple(users_with_file) in duplicated_users:
+                types = [ uid.split("@")[1] if "@" in uid else "unknown" for uid in users_with_file]
+                if len(set(types)) > 1:
+                    print(f"File {file} is shared by users from different sources: {users_with_file}, skipping suggestion.")
+                    continue
+                if not types[0] in ["x", "bsky"]:
+                    continue
+                suggestions.add(
+                    f"{' '.join(users_with_file)} may be the same user. Try user_rename(). Overlapping file: {file}"
+                )
+                duplicated_users.add(tuple(users_with_file))
     duplicated_users = list(set(duplicated_users))
     print("Sanity check done.")
     if suggestions:
@@ -177,6 +207,7 @@ def remove_user():
         sql1 = f'DELETE FROM posts WHERE uid = "{uid}"'
         sql2 = f'DELETE FROM media WHERE uid = "{uid}"'
         sql3 = f'DELETE FROM users WHERE uid = "{uid}"'
+        sql4 = f'DELETE FROM user_group WHERE uid = "{uid}"'
         # if input(f"{sql1}\n{sql2}\n{sql3}\nSure?[y/n]>>") == "y":
         if 1:
             conn = sqlite3.connect(sqlite_file)
@@ -184,6 +215,7 @@ def remove_user():
             cursor.execute(sql1)
             cursor.execute(sql2)
             cursor.execute(sql3)
+            cursor.execute(sql4)
             conn.commit()
             conn.close()
     missing_users = set()
@@ -284,9 +316,13 @@ def user_rename():
             if choice == "1":
                 old_user = duplicated_users[0][0]
                 new_user = duplicated_users[0][1]
-            else:
+            elif choice == "2":
                 old_user = duplicated_users[0][1]
                 new_user = duplicated_users[0][0]
+            else:
+                print("Invalid choice.")
+                duplicated_users.pop(0)
+                continue
 
             # Extract type from uid if it contains @
             if "@" in old_user and "@" in new_user:
@@ -491,7 +527,7 @@ def delete_site():
     print(
         "Delete all data for a specific site from the database. Files in filesystem are not affected."
     )
-    sites_to_choose = ["x", "bsky", "reddit", "fa"]
+    sites_to_choose = ["x", "bsky", "reddit", "fa", "patreon"]
     print("Select site to delete all data:")
     for i, site in enumerate(sites_to_choose):
         print(f"[{i}] {site}")
@@ -566,7 +602,7 @@ def drop_fts_table(cursor):
 
 def create_fts_table(cursor):
     """Create the FTS5 virtual table if it doesn't exist.
-    
+
     The rowid of posts_fts is synchronized with the posts table's rowid.
     This ensures uniqueness without needing slow EXISTS checks in triggers.
     """
@@ -588,7 +624,7 @@ def create_fts_triggers(cursor):
 
     Uses idmap.numid as rowid for posts_fts to ensure uniqueness.
     This eliminates slow EXISTS checks - SQLite's rowid uniqueness handles deduplication.
-    
+
     The idmap table provides a numeric ID for each post_id, which is used
     as the FTS5 docid (rowid) for efficient synchronization.
     """
@@ -612,7 +648,7 @@ def create_fts_triggers(cursor):
 
 def rebuild_fts_table():
     """Rebuild the FTS table from scratch by dropping and recreating.
-    
+
     Uses idmap.numid as rowid for posts_fts, ensuring uniqueness
     and fast lookups without slow EXISTS checks.
     """
@@ -633,14 +669,16 @@ def rebuild_fts_table():
             UNIQUE(post_id)
         )
         """
-        )
+    )
     cursor.execute("CREATE INDEX IF NOT EXISTS idmap_post_id ON idmap(post_id)")
 
     # Ensure idmap is populated for all posts
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT OR IGNORE INTO idmap(post_id)
         SELECT post_id FROM posts
-    """)
+    """
+    )
 
     cursor.execute(
         """
@@ -657,7 +695,7 @@ def rebuild_fts_table():
 
 def sync_fts_incremental():
     """Sync FTS table incrementally by checking for missing entries.
-    
+
     Uses idmap.numid as rowid for posts_fts.
     """
     conn = sqlite3.connect(sqlite_file)
@@ -690,10 +728,12 @@ def sync_fts_incremental():
         conn.commit()
 
     # Ensure idmap is populated for all posts
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT OR IGNORE INTO idmap(post_id)
         SELECT post_id FROM posts
-    """)
+    """
+    )
     conn.commit()
 
     # Get count of posts
@@ -800,7 +840,7 @@ def verify_fts():
 
 def fix_fts_duplicates():
     """Fix duplicate entries in the FTS table by rebuilding it.
-    
+
     Uses idmap.numid as rowid for posts_fts to ensure uniqueness.
     """
     print("Fixing duplicate entries in FTS table...")
@@ -821,10 +861,12 @@ def fix_fts_duplicates():
     create_fts_triggers(cursor)
 
     # Ensure idmap is populated
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT OR IGNORE INTO idmap(post_id)
         SELECT post_id FROM posts
-    """)
+    """
+    )
     conn.commit()
 
     # Repopulate from posts table using idmap.numid for uniqueness

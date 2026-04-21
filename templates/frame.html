@@ -10,132 +10,91 @@
     <meta name="theme-color" content="rgb(0,0,0)">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
     <meta name="mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/style.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/frame.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/landscape_frame.css" id="landscape_frame_style" disabled />
     <style>
-        
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #000;
-        }
-
-        iframe {
-            position: fixed;
-            border: none;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
+        .iframe_container_bg {
+            position: absolute;
+            pointer-events: none;
+            z-index: -1;
             top: 0;
             left: 0;
-        }
-
-        #loading_icon {
-            position: fixed;
-            display: none;
             width: 100%;
             height: 100%;
-            top: 0;
-            left: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            font-size: 1.5rem;
-            z-index: 11;
-            user-select: none;
-        }
-
-        .loader {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 15px;
-            aspect-ratio: 1;
-            border-radius: 50%;
-            animation: l5 1s infinite linear alternate;
-        }
-
-        @keyframes l5 {
-            0% {
-                box-shadow: 20px 0 #fff, -20px 0 #fff2;
-                background: #fff
-            }
-
-            33% {
-                box-shadow: 20px 0 #fff, -20px 0 #fff2;
-                background: #fff2
-            }
-
-            66% {
-                box-shadow: 20px 0 #fff2, -20px 0 #fff;
-                background: #fff2
-            }
-
-            100% {
-                box-shadow: 20px 0 #fff2, -20px 0 #fff;
-                background: #fff
-            }
-        }
-
-        .drag_area {
-            position: fixed;
-            top: 0;
-            left: 4rem;
-            width: 100%;
-            height: env(titlebar-area-height, 0rem);
-            z-index: 8;
-            -webkit-app-region: drag;
-            /* For WebKit browsers like Chrome */
-            app-region: drag;
-            box-shadow: none;
+            background-image: url("{{url_base}}/img/disable.svg");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 2rem 2rem;
+            opacity: 0.2;
         }
     </style>
 </head>
 
-
 <body>
-    <iframe src=""></iframe>
+    <div id="viewport">
+        <div class="iframe_container" id="window1">
+            <div class="iframe_container_bg" id="iframe_container_bg1"></div>
+            <iframe class="iframe_content" id="window1_if" src=""></iframe>
+            <div class="close_window_btn" onclick="close_window(1)">
+                <img src="{{url_base}}/img/cross.svg" />
+            </div>
+            <div class="drag_decoration"></div>
+        </div>
+        <div class="iframe_container" id="window2">
+            <div class="iframe_container_bg" id="iframe_container_bg2"></div>
+            <iframe class="iframe_content" id="window2_if" src=""></iframe>
+            <div class="close_window_btn" onclick="close_window(2)">
+                <img src="{{url_base}}/img/cross.svg" />
+            </div>
+            <div class="drag_decoration"></div>
+        </div>
+        <div id="divider"></div>
+    </div>
     <div id="loading_icon">
         <div class="loader"></div>
     </div>
     <div class="drag_area"></div>
-    <script>
-        // handles reloading, saveing, and restoring iframe state
-        // save iframe current location and scroll position before unload
-        window.addEventListener('beforeunload', function () {
-            const iframe = document.querySelector('iframe');
-            const iframeWindow = iframe.contentWindow;
-            const iframeSrc = iframeWindow.location.href;
-            if (iframeSrc.includes("shorts")||iframeSrc.includes("ruffle")||iframeSrc.includes("about:blank")) {
-                // do not save those positions, as they may cause issues when restored
-                return;
-            }
-            const scrollPosition = iframeWindow.scrollY || iframeWindow.pageYOffset;
-            localStorage.setItem('mt_iframeSrc', iframeSrc);
-            localStorage.setItem('mt_iframeScrollPosition', scrollPosition);
-            localStorage.setItem('mt_iframeTimestamp', Date.now());
-        });
+    <div id="navigation" class="nav translucent">
+        <div class="nav_item_warp">
+            <a class="nav_item" href="{{url_base}}/userlist" onclick="go_userlist()"
+                draggable=true>
+                <img src="{{url_base}}/img/home.svg" />
+                <!-- <div class="nav_item_deco"></div> -->
+            </a>
+            <a class="nav_item" href="{{url_base}}/tl" onclick="go_tl()">
+                <img src="{{url_base}}/img/timeline.svg" />
+                <!-- <div class="nav_item_deco"></div> -->
+            </a>
 
-        // restore iframe src and scroll position on load
-        window.addEventListener('load', function () {
-            const iframe = document.querySelector('iframe');
-            const savedSrc = localStorage.getItem('mt_iframeSrc');
-            const savedScrollPosition = localStorage.getItem('mt_iframeScrollPosition');
-            const savedTimestamp = localStorage.getItem('mt_iframeTimestamp');
-            const now = Date.now();
-            if (savedTimestamp && now - savedTimestamp > 20 * 1000) {
-                localStorage.removeItem('mt_iframeSrc');
-                localStorage.removeItem('mt_iframeScrollPosition');
-                localStorage.removeItem('mt_iframeTimestamp');
-                iframe.src = "{{url_base}}/userlist";
-                return;
-            }
-            if (savedSrc) {
-                iframe.src = savedSrc;
-                iframe.contentWindow.scrollTo(0, parseInt(savedScrollPosition) || 0);
-            } else {
-                iframe.src = "{{url_base}}/userlist";
-            }
-        });
+            <a class="nav_item" href="{{url_base}}/fav" onclick="show_content('{{url_base}}/fav',2)">
+                <img src="{{url_base}}/img/bookmark_empty.svg" />
+                <!-- <div class="nav_item_deco"></div> -->
+            </a>
+
+            <a class="nav_item" href="{{url_base}}/shorts?q={{shorts_q}}"
+                onclick="show_content('{{url_base}}/shorts?q={{shorts_q}}',2)" style="overflow: visible;">
+                <img src="{{url_base}}/img/video.svg" style="transform: scale(1.1);" />
+            </a>
+
+            <a class="nav_item" href="{{url_base}}/download" onclick="show_content('{{url_base}}/download',1)">
+                <img src="{{url_base}}/img/dl.svg" />
+                <!-- <div class="nav_item_deco"></div> -->
+            </a>
+            <a class="nav_item" href="{{url_base}}/settings" onclick="show_content('{{url_base}}/settings',1)">
+                <img src="{{url_base}}/img/gear.svg" />
+                <!-- <div class="nav_item_deco"></div> -->
+            </a>
+            <a class="nav_item" onclick="enter_fullscreen()" id="frame_full_btn">
+                <img src="{{url_base}}/img/full.svg">
+            </a>
+        </div>
+    </div>
+    <script>
+        const url_base = "{{url_base}}";
     </script>
+    <script src="{{url_base}}/js/frame.js"></script>
 </body>
 
 </html>

@@ -14,6 +14,7 @@ from flask import (
 import re, os, time, sys
 import natsort
 from urllib.parse import unquote, quote
+from html import escape, unescape
 import posixpath, json
 from math import ceil, floor
 from random import sample, randint, random
@@ -33,7 +34,10 @@ parser.add_argument(
     "--debug", action="store_true", help="Include this option to enable debug mode."
 )
 
-parser.add_argument("--skip-scan", action="store_true", help="Skip startup scan.")
+parser.add_argument("--skip-scan", action="store_true", help="Skip startup posts scan.")
+parser.add_argument(
+    "--skip-scan-users", action="store_true", help="Skip startup user scan."
+)
 parser.add_argument(
     "--update-daemon",
     action="store_true",
@@ -79,6 +83,7 @@ if args.debug:
     logger.VERBOSE_LEVEL = max(logger.VERBOSE_LEVEL, 1)
     logger.log("Debug mode enabled.", verbose=1)
 args.skip_scan = bool(args.skip_scan)
+args.skip_scan_users = bool(args.skip_scan_users)
 args.monitor_timeline = bool(args.monitor_timeline)
 
 
@@ -138,15 +143,23 @@ def check_auth(required_role=utils.ROLE_AUTHORIZED):
     return decorator
 
 
-tl_current_sort = "new"
-tl_current_page = {
-    "new": 0,
-    "top": 0,
-    "random": 0,
-}
+# tl_current_sort = "new"
+# tl_current_page = {
+#     "new": 0,
+#     "top": 0,
+#     "random": 0,
+# }
 
 
-def get_posts(method="tl", query="", sort_type="new", page=0, user_name="", type_=""):
+def get_posts(
+    method="tl",
+    query="",
+    sort_type="new",
+    page=0,
+    user_name="",
+    type_="",
+    media_only=False,
+):
     """
     A helper function to get posts for timeline.
     :param method: "tl", "fav", or "user"
@@ -158,158 +171,203 @@ def get_posts(method="tl", query="", sort_type="new", page=0, user_name="", type
 
     :return: tuple of (list of post IDs for the page, total post count)
     """
-    global tl_current_sort, tl_current_page
+    media_only = False  # disable media only filter for now, performance concern
 
     if method == "tl":
         if query:
-            sorted_posts_id, all_post_count = backend.db.query_post_by_text(
+            sorted_posts_ids, all_post_count = backend.db.query_post_by_text(
                 query,
                 page * config.items_per_page,
                 config.items_per_page,
                 sort_type=sort_type,
             )
-            sorted_posts_id = [i[0] for i in sorted_posts_id][::-1]
+            sorted_posts_ids = sorted_posts_ids[::-1]
         else:
             all_post_count = backend.db.get_post_count()
             if sort_type == "new":
-                sorted_posts_id = backend.db.get_new(
+                sorted_posts_ids, _ = backend.db.get_new(
                     page * config.items_per_page, config.items_per_page
                 )
             elif sort_type == "top":
-                sorted_posts_id = backend.db.get_top(
+                sorted_posts_ids, _ = backend.db.get_top(
                     page * config.items_per_page, config.items_per_page
                 )
             elif sort_type == "random":
-                sorted_posts_id = backend.db.get_random(config.items_per_page)
+                sorted_posts_ids = backend.db.get_random(config.items_per_page)
             else:
                 return [], 0
-            sorted_posts_id = [i[0] for i in sorted_posts_id][::-1]
-        return sorted_posts_id, all_post_count
+            sorted_posts_ids = sorted_posts_ids[::-1]
+        return sorted_posts_ids, all_post_count
 
     elif method == "fav":
-        sorted_posts_id = backend.get_fav()
-        all_post_count = len(sorted_posts_id)
-        sorted_posts_id = sorted_posts_id[
+        sorted_posts_ids = backend.get_fav()
+        all_post_count = len(sorted_posts_ids)
+        sorted_posts_ids = sorted_posts_ids[
             page * config.items_per_page : (page + 1) * config.items_per_page
         ][::-1]
-        sorted_posts_id = [i[0] for i in sorted_posts_id if i[0]]
-        return sorted_posts_id, all_post_count
+        return sorted_posts_ids, all_post_count
 
     elif method == "user":
         if not user_name or not type_:
             return [], 0
         uid = f"{user_name}@{type_}"
-        all_rows = backend.db.query_rows(
-            selected_table="posts",
-            key="uid",
-            value=uid,
-            sort_key=utils.sort_keys[sort_type],
-        )
-        all_post_count = len(all_rows)
-        sorted_posts_id = [
-            row[0]
-            for row in all_rows[
-                page * config.items_per_page : (page + 1) * config.items_per_page
-            ]
-        ][::-1]
-        return sorted_posts_id, all_post_count
+        if sort_type == "new":
+            sorted_posts_ids, all_post_count = backend.db.get_new(
+                page * config.items_per_page,
+                config.items_per_page,
+                uid=uid,
+                media_only=media_only,
+            )
+        elif sort_type == "top":
+            sorted_posts_ids, all_post_count = backend.db.get_top(
+                page * config.items_per_page,
+                config.items_per_page,
+                uid=uid,
+                media_only=media_only,
+            )
+        elif sort_type == "random":
+            all_post_count = backend.db.get_post_count()
+            sorted_posts_ids = backend.db.get_random(config.items_per_page)
+        else:
+            return [], 0
+        sorted_posts_ids = sorted_posts_ids[::-1]
+        return sorted_posts_ids, all_post_count
 
     return [], 0
 
 
-def get_timeline_fragment(
-    method="tl",
-    type_="",
-    sorted_posts_id=[],
-    all_post_count=0,
-    sort_type="new",
-    q="",
-    user_name="",
-    p=0,
-):
+def get_posts_n_users_by_ids(post_ids, load_reply=True, load_comments=False):
     posts = {}
     users = {}
-    external_posts = {}
+
+    external_posts = {} # save some db queries
+
+    reply_relationships = {}  # post_id -> reply_to_id, for loop detection and sorting
     cnt = 0
+    bump_actions = 0
+    max_bump_actions = config.items_per_page * 30
     stop_load_reply = False
-    while cnt < len(sorted_posts_id):
-        if len(sorted_posts_id) > config.items_per_page * 10:
+    max_posts_to_load = config.items_per_page * 30
+
+    sorted_posts_ids = post_ids.copy()
+    while cnt < len(sorted_posts_ids):
+        if len(sorted_posts_ids) > max_posts_to_load and not stop_load_reply:
             logger.log(
-                f"Warning: Large number of posts to load: {len(sorted_posts_id)}",
-                type="warning",
-                verbose=2,
-            )
-        if len(sorted_posts_id) > config.items_per_page * 20 and not stop_load_reply:
-            logger.log(
-                f"Error: Too many posts to load: {len(sorted_posts_id)}, there might be a loop in replies. Stopping further loading.",
+                f"Warning: Too many posts to load: {len(sorted_posts_ids)}, there might be a loop in replies. Stopping further reply loading.",
                 type="warning",
             )
             stop_load_reply = True
-        post_id = sorted_posts_id[cnt]
+
+        post_id = sorted_posts_ids[cnt]
         cnt += 1
+
         if post_id in posts:
-            post = posts[post_id]
-            # load reply info here, so that replies of duplicate posts are also handled
-            if (
-                post.isreply
-                and post.reply_to
-                and method != "fav"
-                and not stop_load_reply
-            ):
-                reply_post_id, reply_user_name = post.reply_to.split("@")
-                sorted_posts_id.insert(cnt, reply_post_id)
-                external_posts[reply_post_id] = (post.type, reply_user_name)
-            continue
-        if post_id in ("redgifs",):
+            # This post is already loaded, if it's a reply, bump its reply_to to the front
+            if post_id in reply_relationships:
+                reply_post_id = reply_relationships[post_id]
+                logger.log(
+                    f"post {post_id} is already loaded, bumped its reply_to {reply_post_id} to the front",
+                    verbose=3,
+                )
+                if (
+                    reply_post_id in sorted_posts_ids
+                    and bump_actions < max_bump_actions
+                ):
+                    sorted_posts_ids.remove(reply_post_id)
+                    cnt -= 1
+                    sorted_posts_ids.insert(cnt, reply_post_id)
+                    bump_actions += 1
             continue
 
         post = backend.Post(post_id, None, None)
+        # Load post info
         if not post.load_from_db():
-            if method == "tl" or method == "user":
-                post.isplaceholder = True
-                post.type, post.user_name = external_posts.get(post_id, ("", ""))
-                post.concat_url()
-                logger.log(f"guessed url for external post: {post.url}", verbose=3)
-            elif method == "fav":
-                logger.log(f"Post [{post_id}] not found.", verbose=3)
-                post.user_name = "None"
-                post.text_content = (
-                    f"This post is missing from file system. [{post_id}]"
-                )
-                post.fav = True
-            else:
-                post.user_name = "None"
-                post.text_content = f"HOW DID YOU EVEN GET HERE? [{post_id}]"
-
-        # Load reply info
-        if post.isreply and post.reply_to and not stop_load_reply:
-            logger.log(f"post {post.post_id} is a reply to {post.reply_to}", verbose=3)
-            reply_post_id, reply_user_name = post.reply_to.split("@")
-            sorted_posts_id.insert(cnt, reply_post_id)
-            external_posts[reply_post_id] = (post.type, reply_user_name)
-
-        post.init_medias()
-        post.init_embed()
-        posts[post_id] = post
+            post.isplaceholder = True
+            post.type, post.user_name = external_posts.get(post_id, ("", ""))
+            post.concat_url()
+            logger.log(f"guessed url for external post: {post.url}", verbose=3)
+        else:
+            post.init_medias()
+            post.init_embed()
 
         # Load user info
         if post.user_name not in users:
             user = backend.User(post.user_name, post.type)
             user.load_from_db()
-            if method == "fav" and post.user_name == "None":
-                user.nick = "None"
             users[post.user_name] = user
 
-    sorted_posts_id = sorted_posts_id[::-1]
+        posts[post_id] = post
+
+        # push its reply_to to the list if it has one
+        if post.isreply and post.reply_to and load_reply and (not stop_load_reply):
+            logger.log(f"post {post.post_id} is a reply to {post.reply_to}", verbose=3)
+            reply_post_id, reply_user_name = post.reply_to.split("@")
+            reply_post_id = reply_post_id + "@" + post.type  # ensure type suffix
+            external_posts[reply_post_id] = (post.type, reply_user_name)
+            reply_relationships[post_id] = reply_post_id
+            if reply_post_id in sorted_posts_ids and bump_actions < max_bump_actions:
+                logger.log(
+                    f"post {post_id} bumped its reply_to {reply_post_id} to the front",
+                    verbose=3,
+                )
+                sorted_posts_ids.remove(reply_post_id)
+                cnt -= 1
+                sorted_posts_ids.insert(cnt, reply_post_id)
+                bump_actions += 1
+            else:
+                sorted_posts_ids.insert(cnt, reply_post_id)
+
+        # push its comments to the list if it has any
+        if load_comments:
+            logger.log(f"Loading comments for post {post_id}...", verbose=3)
+            reply_to_id = f"{post_id.split('@')[0]}@{users[post.user_name].udid}"
+            comments_rows = db.raw_query(
+                ("SELECT post_id, uid FROM posts WHERE reply_to = ?", (reply_to_id,))
+            )
+            for comment_post_id, comment_uid in comments_rows:
+                if not "@" in comment_post_id:
+                    comment_post_id = (
+                        comment_post_id + "@" + post.type
+                    )  # ensure type suffix
+                comment_user_name = comment_uid.split("@")[0]
+                external_posts[comment_post_id] = (post.type, comment_user_name)
+                if not comment_post_id in sorted_posts_ids:
+                    sorted_posts_ids.append(comment_post_id)
+                    logger.log(
+                        f"Added comment post {comment_post_id} to load list.", verbose=3
+                    )
+
+        if bump_actions >= max_bump_actions:
+            logger.log(
+                f"Reached max bump actions ({max_bump_actions}), stop bumping posts to the front, potential loop in replies.",
+                type="warning",
+            )
+
+    sorted_posts_ids = sorted_posts_ids[::-1]
 
     # Remove duplicates while preserving order
-    seen = set()
-    unique_sorted_posts_id = []
-    for post_id in sorted_posts_id:
-        if post_id not in seen:
-            seen.add(post_id)
-            unique_sorted_posts_id.append(post_id)
-    sorted_posts_id = unique_sorted_posts_id
+    # seen = set()
+    # unique_sorted_posts_ids = []
+    # for post_id in sorted_posts_ids:
+    #     if post_id not in seen:
+    #         seen.add(post_id)
+    #         unique_sorted_posts_ids.append(post_id)
+    # sorted_posts_ids = unique_sorted_posts_ids
+    return posts, users, sorted_posts_ids
+
+
+def get_timeline_fragment(
+    method="tl",
+    type_="",
+    sorted_posts_ids=[],
+    all_post_count=0,
+    sort_type="new",
+    q="",
+    user_name="",
+    p=0,
+    tab="posts",
+):
+    posts, users, sorted_posts_ids = get_posts_n_users_by_ids(sorted_posts_ids)
 
     # Determine page URL and rendering options
     if method == "tl":
@@ -330,7 +388,7 @@ def get_timeline_fragment(
         "timeline.html",
         section=method,
         posts=posts,
-        sorted_posts_id=sorted_posts_id,
+        sorted_posts_ids=sorted_posts_ids,
         items_per_page=config.items_per_page,
         user_name=user_name if method == "user" else "",
         type=type_ if method == "user" else ("tl" if method == "tl" else ""),
@@ -340,6 +398,8 @@ def get_timeline_fragment(
         sort_type=sort_type,
         q=q,
         p=p + 1,
+        quote=quote,
+        unquote=unquote,
     )
 
     # Build content with optional headers
@@ -355,6 +415,7 @@ def get_timeline_fragment(
             user=user_obj,
             url_base=config.url_base,
             posts_cnt=all_post_count,
+            tab=tab,
         )
         content = userheader + timeline_content
     return content
@@ -363,19 +424,20 @@ def get_timeline_fragment(
 def get_mediagrid_fragment(
     method="tl",
     type_="",
-    sorted_posts_id=[],
+    sorted_posts_ids=[],
     all_post_count=0,
     sort_type="new",
     q="",
     user_name="",
     p=0,
+    tab="media",
 ):
     posts = {}
     users = {}
     external_posts = {}
 
     cnt = 0
-    for post_id in sorted_posts_id:
+    for post_id in sorted_posts_ids:
         post = backend.Post(post_id, None, None)
         post.load_from_db()
         post.init_medias()
@@ -400,7 +462,7 @@ def get_mediagrid_fragment(
         "mediagrid.html",
         section=method,
         posts=posts,
-        sorted_posts_id=sorted_posts_id[::-1],
+        sorted_posts_ids=sorted_posts_ids[::-1],
         items_per_page=config.items_per_page,
         user_name=user_name if method == "user" else "",
         type=type_ if method == "user" else ("tl" if method == "tl" else ""),
@@ -410,6 +472,8 @@ def get_mediagrid_fragment(
         sort_type=sort_type,
         q=q,
         p=p + 1,
+        quote=quote,
+        unquote=unquote,
     )
 
     # Build content with optional headers
@@ -425,6 +489,7 @@ def get_mediagrid_fragment(
             user=user_obj,
             url_base=config.url_base,
             posts_cnt=all_post_count,
+            tab=tab,
         )
         content = userheader + timeline_content
     return content
@@ -437,35 +502,26 @@ def _timeline(method="tl", type_="", user_name=""):
     :param type_: user type like "x", "bsky", "reddit", "fa" (only used for "user" method)
     :param user_name: user name (only used for "user" method)
     """
-    global tl_current_sort, tl_current_page
+    # global tl_current_sort, tl_current_page
     # if utils.busy_flag:
     #     return render_template("busy.html", url_base=config.url_base)
     user_name = user_name.lower()
+    if "@" in user_name:
+        user_name = user_name.split("@")[0]
 
     page = int(request.args.get("p", "1")) - 1
     page = max(0, page)
     tab = request.args.get("tab", "posts")
     query = request.args.get("q", "").strip()
-
-    if "sort_type" in request.args:
-        sort_type = request.args["sort_type"]
-        if method == "tl":
-            tl_current_sort = sort_type
-    else:
-        if method == "tl":
-            sort_type = tl_current_sort
-        else:
-            sort_type = "new"
+    sort_type = request.args.get("sort_type", "new").strip()
 
     if method == "tl":
-        if "p" in request.args:
-            tl_current_page[tl_current_sort] = page
-        elif not query:
-            page = tl_current_page[tl_current_sort]
-
-    if method == "tl":
-        sorted_posts_id, all_post_count = get_posts(
-            method="tl", query=query, sort_type=sort_type, page=page
+        sorted_posts_ids, all_post_count = get_posts(
+            method="tl",
+            query=query,
+            sort_type=sort_type,
+            page=page,
+            media_only=(tab == "media"),
         )
         page_url = f"{config.url_base}/tl"
         if not query and sort_type not in ("new", "top", "random"):
@@ -479,18 +535,21 @@ def _timeline(method="tl", type_="", user_name=""):
         )
     elif method == "fav":
         try:
-            sorted_posts_id, all_post_count = get_posts(method="fav", page=page)
+            sorted_posts_ids, all_post_count = get_posts(
+                method="fav", page=page, media_only=(tab == "media")
+            )
         except ValueError:
             return "Not enough posts. Download more and come back later."
         page_url = f"{config.url_base}/fav"
         current_url = posixpath.join("/", config.url_base, "fav") + "?tab=" + tab
     elif method == "user":
-        sorted_posts_id, all_post_count = get_posts(
+        sorted_posts_ids, all_post_count = get_posts(
             method="user",
             page=page,
             sort_type=sort_type,
             user_name=user_name,
             type_=type_,
+            media_only=(tab == "media"),
         )
         page_url = f"{config.url_base}/user/{type_}/{user_name}"
         user_name = user_name.lower()
@@ -511,29 +570,33 @@ def _timeline(method="tl", type_="", user_name=""):
         content_frag = get_mediagrid_fragment(
             method=method,
             type_=type_,
-            sorted_posts_id=sorted_posts_id,
+            sorted_posts_ids=sorted_posts_ids,
             all_post_count=all_post_count,
             sort_type=sort_type,
             q=query,
             user_name=user_name,
             p=page,
+            tab=tab,
         )
     else:
         content_frag = get_timeline_fragment(
             method=method,
             type_=type_,
-            sorted_posts_id=sorted_posts_id,
+            sorted_posts_ids=sorted_posts_ids,
             all_post_count=all_post_count,
             sort_type=sort_type,
             q=query,
             user_name=user_name,
             p=page,
+            tab=tab,
         )
 
     # Build nav template kwargs
     nav_kwargs = {
         "content": content_frag,
         "current_page": page + 1,
+        "current_tab": tab,
+        "sort_type": sort_type,
         "current_url": current_url,
         "max_page": max_page,
         "section": method,
@@ -576,7 +639,7 @@ def build_app():
     @app.after_request
     def set_csp_header(response):
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:;"
         )
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
@@ -594,21 +657,36 @@ def build_app():
 
     @app.route(posixpath.join("/", config.url_base, "js", "<fn>"))
     def _js(fn):
-        if ".." in fn or not os.path.exists(posixpath.join("js", fn)):
+        if (
+            ".." in fn
+            or "/" in fn
+            or "\\" in fn
+            or not os.path.exists(posixpath.join("js", fn))
+        ):
             logger.log(f"File not found: js/{fn}.")
             return "File not found.", 404
         return set_cache_header(send_from_directory("js", fn))
 
     @app.route(posixpath.join("/", config.url_base, "css", "<fn>"))
     def _css(fn):
-        if ".." in fn or not os.path.exists(posixpath.join("css", fn)):
+        if (
+            ".." in fn
+            or "/" in fn
+            or "\\" in fn
+            or not os.path.exists(posixpath.join("css", fn))
+        ):
             logger.log(f"File not found: css/{fn}.")
             return "File not found.", 404
         return set_cache_header(send_from_directory("css", fn))
 
     @app.route(posixpath.join("/", config.url_base, "img", "<fn>"))
     def _img(fn):
-        if ".." in fn or not os.path.exists(posixpath.join("img", fn)):
+        if (
+            ".." in fn
+            or "/" in fn
+            or "\\" in fn
+            or not os.path.exists(posixpath.join("img", fn))
+        ):
             logger.log(f"File not found: img/{fn}.")
             return "File not found.", 404
         return set_cache_header(send_from_directory("img", fn))
@@ -743,17 +821,15 @@ def build_app():
 
     @app.route(posixpath.join("/", config.url_base + "/"))
     @app.route(posixpath.join("/", config.url_base))
+    @check_auth()
     def _index():
         return render_template("frame.html", url_base=config.url_base)
 
     @app.route(posixpath.join("/", config.url_base, "userlist"))
     @check_auth()
     def _userlist():
-        if "p" in request.args:
-            page = int(request.args["p"]) - 1
-            page = max(0, page)
-        else:
-            page = 0
+        page = max(int(request.args.get("p", 1)) - 1, 0)
+        sort_type = request.args.get("sort_type", "new")
 
         query = request.args.get("q", "").strip()
         tab = request.args.get("tab", "all")
@@ -772,7 +848,7 @@ def build_app():
                 )
                 all_users = [
                     u
-                    for u in backend.all_users
+                    for u in backend.all_users[sort_type]
                     if fuzz_query in u.nick.lower()
                     or fuzz_query in u.uid.lower()
                     or fuzz_query in u.user_name.lower()
@@ -783,12 +859,18 @@ def build_app():
                 ]
                 max_page = ceil(len(all_users) / config.items_per_page)
             else:
-                users = backend.all_users[
+                users = backend.all_users[sort_type][
                     page * config.items_per_page : (page + 1) * config.items_per_page
                 ]
-                max_page = ceil(len(backend.all_users) / config.items_per_page)
+                max_page = ceil(
+                    len(backend.all_users[sort_type]) / config.items_per_page
+                )
             userlist = render_template(
-                "userlist.html", users=users, url_base=config.url_base, tab=tab
+                "userlist.html",
+                users=users,
+                url_base=config.url_base,
+                tab=tab,
+                sort_type=sort_type,
             )
         else:
             all_groups = backend.get_user_groups()
@@ -814,19 +896,23 @@ def build_app():
                 users_in_groups=users_in_groups,
                 url_base=config.url_base,
                 tab=tab,
+                sort_type=sort_type,
             )
 
         return render_template(
             "nav.html",
             current_page=page + 1,
             current_q=query,
-            current_url=posixpath.join("/", config.url_base, "userlist"),
+            current_url=posixpath.join(
+                "/", config.url_base, f"userlist?sort_type={sort_type}"
+            ),
             max_page=max_page,
             content=seach_bar + userlist,
-            section="user",
+            section="userlist",
             url_base=config.url_base,
             shorts_decoration="",
             shorts_icon="",
+            sort_type=sort_type,
         )
 
     @app.route(posixpath.join("/", config.url_base, "tl"))
@@ -842,6 +928,15 @@ def build_app():
     @app.route(posixpath.join("/", config.url_base, "user", "<type>", "<name>"))
     @check_auth()
     def _timeline_user(type, name):
+        logger.log(
+            f"Cuurently scanning user: {backend.current_scan_user}, requested: {name}"
+        )
+        if backend.current_scan_user == name:
+            return render_template(
+                "busy.html",
+                url_base=config.url_base,
+                message=f"Currently scanning {name}'s posts. Please wait.",
+            )
         return _timeline(method="user", type_=type, user_name=name)
 
     @app.route(posixpath.join("/", config.url_base, "add_fav"))
@@ -865,53 +960,56 @@ def build_app():
 
     @app.route(
         posixpath.join(
-            "/", config.url_base, "fullscreen_card", "<type>", "<name>", "<filename>"
+            "/", config.url_base, "fullscreen_card", "<type>", "<name>", "<pid>"
         )
     )
     @check_auth()
-    def _fullscreen_card(type, name, filename):
-
-        if type in ["x", "bsky", "reddit"]:
-            media_id = filename.split(".")[0]
-        elif type == "fa":
-            media_id = filename
-        else:
-            return "Invalid type."
-        media = backend.Media(media_id, None, name, type)
-        media.load_from_db()
+    def _fullscreen_card(type, name, pid):
+        # if type == "patreon":
+        #     print("Accessing Patreon media:", filename)
+        #     filename = unescape(filename)
+        #     print("Decoded filename:", filename)
+        media_index = int(request.args.get("idx", 0))
         user = backend.User(name, type)
         user.load_from_db()
-        post = backend.Post(media.post_id, name, type)
+        post = backend.Post(pid, name, type)
         post.load_from_db()
 
         media_ids = backend.db.query_rows(
             selected_table="media",
             key="post_id",
-            value=media.post_id,
+            value=pid,
             sort_key=utils.sort_keys["e0"],
             reverse=False,
         )
-        media_ids = [m[0] for m in media_ids]
+        media_ids = [m[0] for m in media_ids if m[5] in (utils.VIDEO, utils.IMAGE)]
+        if len(media_ids) == 0:
+            return "No media found for this post.", 404
+        media_id = (
+            media_ids[media_index]
+            if media_index and 0 <= media_index < len(media_ids)
+            else media_ids[0]
+        )
+        media = backend.Media(media_id, None, name, type)
+        media.load_from_db()
         logger.log("media_ids for post", media.post_id, ":", media_ids, verbose=2)
-        media_index = media_ids.index(media.media_id)
-        logger.log("media_index:", media_index, verbose=2)
         if media_index > 0:
             prev_url = posixpath.join(
                 config.url_base or "/",
                 "fullscreen_card",
                 type,
                 name,
-                f"{media_ids[media_index-1]}.jpg",
+                f"{pid}?idx={media_index-1}",
             )
         else:
             prev_url = ""
-        if media_index < len(media_ids) - 1:
+        if media_index < len(media_ids) - 1 and media_index != -1:
             next_url = posixpath.join(
                 config.url_base or "/",
                 "fullscreen_card",
                 type,
                 name,
-                f"{media_ids[media_index+1]}.jpg",
+                f"{pid}?idx={media_index+1}",
             )
         else:
             next_url = ""
@@ -924,8 +1022,14 @@ def build_app():
             url_base=config.url_base,
             prev_url=prev_url,
             next_url=next_url,
-            alt_text=post.alts[media_index] if media_index < len(post.alts) else "",
+            alt_text=(
+                post.alts[media_index]
+                if (media_index < len(post.alts) and media_index != -1)
+                else ""
+            ),
             media_idx=media_index,
+            quote=quote,
+            unquote=unquote,
         )
         return card
 
@@ -934,102 +1038,12 @@ def build_app():
     )
     @check_auth()
     def _post(type, name, post_id):
-        users = {}
-
-        post = backend.Post(post_id, name, type)
-        post_found = post.load_from_db()
-
-        post.init_medias()
-        post.init_embed()
-
-        user = backend.User(name, type)
-        user.load_from_db()
-        users[name] = user
-
-        reply_tos = [post]
-
-        cursor = 0
-        stop_load_reply = False
-        while cursor < len(reply_tos) and not stop_load_reply:
-            if cursor > 999:
-                logger.log(
-                    f"Warning: Too many parent posts to load for post {post_id}, there might be a loop in replies. Stopping further loading.",
-                    type="warning",
-                )
-                stop_load_reply = True
-            post = reply_tos[cursor]
-            cursor += 1
-            if post.reply_to and not stop_load_reply:
-                reply_post_id, reply_user_name = post.reply_to.split("@")
-                reply_post = backend.Post(reply_post_id, reply_user_name, type)
-                if not reply_post.load_from_db():
-                    logger.log(
-                        f"Reply post {reply_post_id} not found for post {post.post_id}."
-                    )
-                    continue
-                reply_user_name = reply_post.user_name
-                reply_post.init_medias()
-                reply_post.init_embed()
-                reply_tos.append(reply_post)
-                if reply_post.user_name not in users:
-                    reply_user = backend.User(reply_user_name, type)
-                    reply_user.load_from_db()
-                    users[reply_user_name] = reply_user
-
-        comments = [post]
-        cursor = 0
-        stop_load_reply = False
-        while cursor < len(comments):
-            if cursor > 999 and not stop_load_reply:
-                logger.log(
-                    f"Warning: Too many parent posts to load for post {post_id}, there might be a loop in replies. Stopping further loading.",
-                    type="warning",
-                )
-                stop_load_reply = True
-            post = comments[cursor]
-            cursor += 1
-            if not stop_load_reply:
-                replies = backend.db.query_rows(
-                    selected_table="posts",
-                    key="reply_to",
-                    value=f"{post.post_id}@{user.udid}",
-                    reverse=False,
-                )
-            else:
-                replies = []
-            for reply in replies:
-                reply_post_id = reply[0]
-                reply_user_name = reply[2].split("@")[0]
-                reply_post = backend.Post(reply_post_id, reply_user_name, type)
-                if not reply_post.load_from_db():
-                    logger.log(
-                        f"Reply post {reply_post_id} not found for post {post.post_id}."
-                    )
-                    continue
-                reply_user_name = reply_post.user_name
-                reply_post.init_medias()
-                reply_post.init_embed()
-                comments.append(reply_post)
-                if reply_user_name not in users:
-                    reply_user = backend.User(reply_user_name, type)
-                    reply_user.load_from_db()
-                    users[reply_user_name] = reply_user
-
-        seen_posts = set()
-        all_related_posts = []
-        for comment in comments:
-            if comment.post_id not in seen_posts:
-                all_related_posts.append(comment)
-                seen_posts.add(comment.post_id)
-        for reply_to in reply_tos:
-            if reply_to.post_id not in seen_posts:
-                all_related_posts.append(reply_to)
-                seen_posts.add(reply_to.post_id)
-
-        sorted_posts = sorted(all_related_posts, key=lambda x: x.time)
-
+        posts, users, sorted_posts_ids = get_posts_n_users_by_ids(
+            [post_id], load_reply=True, load_comments=True
+        )
+        _banner_url = posixpath.join("/", config.url_base, "banner", type, name)
         logger.log(
-            f"Loaded {len(comments)} comments for post {post_id}, and {len(reply_tos)-1} parent posts.",
+            f"Loaded {len(posts)} comments for post {post_id}.",
             verbose=2,
         )
         logger.log(
@@ -1038,17 +1052,21 @@ def build_app():
         content_frag = render_template(
             "comments.html",
             highlight_post_id=post_id,
-            reply_tos=reply_tos,
-            comments=comments,
-            sorted_posts=sorted_posts,
+            sorted_posts_ids=sorted_posts_ids,
+            posts=posts,
             users=users,
             url_base=config.url_base,
-            post_found=post_found,
+            post_found=post_id in posts,
             detailed_view=True,
+            _banner_url=_banner_url,
+            quote=quote,
+            unquote=unquote,
         )
         nav_kwargs = {
             "content": content_frag,
             "current_page": 1,
+            "current_tab": "comments",
+            # "sort_type": sort_type,
             "current_url": posixpath.join(
                 "/", config.url_base, "comments", type, name, post_id
             ),
@@ -1058,9 +1076,9 @@ def build_app():
             "shorts_decoration": "",
             "shorts_icon": "",
             "show_back_btn": True,
-            "adjust_padding_top": "5rem",
+            "adjust_padding_top": "4rem",
             "title_str": "Post by " + users[name].nick if name in users else "Post",
-            "title_secondary_str": f"{len(all_related_posts)} posts in this thread",
+            "title_secondary_str": f"{len(posts)} posts in this thread",
         }
         return render_template("nav.html", **nav_kwargs)
 
@@ -1074,6 +1092,34 @@ def build_app():
             type=type,
             user_name=name,
             file_name=filename,
+            url_base=config.url_base,
+        )
+
+    @app.route(
+        posixpath.join("/", config.url_base, "text", "<type>", "<name>", "<filename>")
+    )
+    @check_auth()
+    def _text(type, name, filename):
+        file_path = f"{config.fs_bases[type]}/{name}/{filename}"
+        if not os.path.exists(file_path):
+            logger.log(f"File not found: {file_path}.")
+            return "File not found.", 404
+        if "/.." in file_path or "../" in file_path or '"' in file_path:
+            logger.log(f"Security warning: suspicious path: {file_path}.", type="error")
+            return "File not found.", 404
+        if utils.media_type_from_extension(filename) != utils.PLAIN_TEXT:
+            logger.log(f"File {file_path} is not a plain text file.", type="error")
+            return "File not found.", 404
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+        content = utils.render_bbcode(content)
+        return render_template(
+            "text_viewer.html",
+            title=filename,
+            content=content,
+            download_url=posixpath.join(
+                "/", config.url_base, "file", type, name, filename
+            ),
             url_base=config.url_base,
         )
 
@@ -1096,7 +1142,9 @@ def build_app():
             shorts_icon="",
         )
 
-    @app.route(posixpath.join("/", config.url_base, "file", "<type>", "<name>", "<fn>"))
+    @app.route(
+        posixpath.join("/", config.url_base, "file", "<type>", "<name>", "<path:fn>")
+    )
     @check_auth()
     def _file(type, name, fn):
         fn = unquote(fn)
@@ -1104,13 +1152,53 @@ def build_app():
         if not os.path.exists(file_path):
             logger.log(f"File not found: {file_path}.")
             return "File not found.", 404
-        if ".." in file_path or '"' in file_path:
+        if "/.." in file_path or "../" in file_path or '"' in file_path:
             logger.log(f"Security warning: suspicious path: {file_path}.", type="error")
             return "File not found.", 404
         return set_cache_header(send_file(file_path))
 
     @app.route(
-        posixpath.join("/", config.url_base, "thumb", "<type>", "<name>", "<fn>")
+        posixpath.join("/", config.url_base, "upload", "<type>", "<name>", "<post_id>"),
+        methods=["GET", "POST"],
+    )
+    @check_auth(required_role=utils.ROLE_ADMIN)
+    def _upload_file(type, name, post_id):
+        if request.method == "GET":
+            return render_template(
+                "upload.html",
+                url_base=config.url_base,
+                post_id=post_id,
+            )
+        else:
+            # Handle file upload
+            if "file" not in request.files:
+                return "No file part in the request.", 400
+            file = request.files["file"]
+            if file.filename == "":
+                return "No selected file.", 400
+            save_path = f"{config.fs_bases[type]}/{name}/{post_id.split('@')[0]}_{file.filename}"
+            if "/.." in save_path or "../" in save_path or '"' in save_path:
+                logger.log(
+                    f"Security warning: suspicious path for upload: {save_path}.",
+                    type="error",
+                )
+                return "Invalid file path.", 400
+            # check file size, limit to 100MB
+            file.seek(0, os.SEEK_END)
+            file_length = file.tell()
+            file.seek(0)
+            if file_length > 100 * 1024 * 1024:
+                return "File is too large. Max size is 100MB.", 400
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            file.save(save_path)
+            logger.log(f"File uploaded successfully to {save_path}.")
+            utils.download_jobs.insert(
+                0, (f"{name}@{type}", False, False, utils.TYPE_RESCAN)
+            )
+            return f"File uploaded as {save_path.split('/')[-1]}. It will be processed shortly."
+
+    @app.route(
+        posixpath.join("/", config.url_base, "thumb", "<type>", "<name>", "<path:fn>")
     )
     @check_auth()
     def _thumb(type, name, fn):
@@ -1128,7 +1216,7 @@ def build_app():
                 set_cache_header(send_file("img/error.jpg", mimetype="image/jpeg")),
                 404,
             )
-        if ".." in path or '"' in path:
+        if "/.." in path or "../" in path or '"' in path:
             logger.log(
                 f"Security warning: suspicious path for thumbnail: {path}.",
                 type="error",
@@ -1156,6 +1244,8 @@ def build_app():
             file_name=fn,
             isvideo=fn.endswith(".mp4") or fn.endswith(".webm"),
             url_base=config.url_base,
+            quote=quote,
+            unquote=unquote,
         )
 
     @app.route(
@@ -1176,12 +1266,43 @@ def build_app():
                 url = url.split("?")[0]
             full = data.get("full", False)
             media_only = data.get("media_only", False)
-            if not (
+            if re.match(r"[a-zA-Z0-9_.-]+@[a-zA-Z]+", url):
+                utils.download_jobs.insert(0, (url, False, False, utils.TYPE_RESCAN))
+                msg = f"Rescan submitted for user {url}."
+                logger.log(msg)
+                return jsonify(
+                    {
+                        "status": "ok",
+                        "message": msg,
+                        "current": utils.current_url,
+                        "queue": utils.download_jobs,
+                    }
+                )
+            elif (
+                ("patreon.com" in url)
+                or ("onlyfans.com" in url)
+                or ("fanbox.cc" in url)
+            ):
+                msg = (
+                    f"URL not supported. Have you heard of kemono.party / coomer.party?"
+                )
+                logger.log(msg, type="warning")
+                return jsonify(
+                    {
+                        "status": "ok",
+                        "message": msg,
+                        "current": utils.current_url,
+                        "queue": utils.download_jobs,
+                    }
+                )
+            elif not (
                 "bsky" in url
                 or "x.com" in url
                 or "twitter" in url
                 or "reddit" in url
                 or "furaffinity" in url
+                or "kemono." in url
+                or "coomer." in url
             ):
                 msg = f"Invalid URL: {url}\n"
                 logger.log(msg)
@@ -1217,6 +1338,7 @@ def build_app():
             url = url.replace("http://", "https://").strip("/")
             if url.endswith("/media"):
                 url = url[:-6]
+            # Handle Twitter to X transition
             if "twitter.com" in url:
                 url = url.replace("twitter.com", "x.com")
             if "/photo/" in url:
@@ -1253,98 +1375,66 @@ def build_app():
     @app.route(posixpath.join("/", config.url_base, "shorts"), methods=["GET"])
     @check_auth()
     def _shorts():
-        # if utils.busy_flag:
-        #     return render_template("busy.html", url_base=config.url_base)
-        type = request.args.get("type", "")
-        user_name = request.args.get("user", "")
-        uid = f"{user_name}@{type}"
+        uid = request.args.get("uid", "")
+        user_name, type = uid.split("@") if "@" in uid else (None, None)
         query = request.args.get("q", "")
-        if query:
-            if query == "fav":
-                media_ids, total_cnt = backend.db.query_fav_videos()
-            elif re.match(r"[\w.\-]+@\w+", query):
-                media_ids, total_cnt = backend.db.query_video_by_uid(query, 0, 1)
-            else:
-                media_ids, total_cnt = backend.db.query_post_by_text(
-                    query, 0, 1, include="video"
-                )
-            return render_template(
-                "shorts.html",
-                url_base=config.url_base,
-                type=type,
-                user=user_name,
-                query=query,
-                current_cnt=0,
-                total_cnt=total_cnt,
-            )
-        else:
-            user_name = ""
-            idx = randint(0, 999999)
-            return render_template(
-                "shorts.html",
-                url_base=config.url_base,
-                type=type,
-                current_cnt=idx,
-                user=user_name,
-                query=query,
-                total_cnt=0,
-            )
+        return render_template(
+            "shorts.html",
+            url_base=config.url_base,
+            type=type,
+            user=user_name,
+            uid=uid,
+            query=query,
+            anchor=request.args.get("anchor", ""),
+            current_cnt=0,
+            total_cnt=0,
+        )
 
     @app.route(
         posixpath.join("/", config.url_base, "api", "get-a-vid"), methods=["GET"]
     )
     @check_auth()
     def _api_get_a_vid():
-        user_name = request.args.get("user", "")
-        type = request.args.get("type", "")
-        uid = f"{user_name}@{type}"
-        idx = int(request.args.get("idx", 0))
+        uid = request.args.get("uid", "")
+        user_name, type = uid.split("@") if "@" in uid else (None, None)
+        anchor = request.args.get("anchor", "")
         query = request.args.get("q", "").strip()
-        if query:
+        sort_type = request.args.get("sort_type", "new")
+        on_anchor = request.args.get("on_anchor", "0") == "1"
+
+        logger.log(
+            f"API get-a-vid called with user='{user_name}', type='{type}', anchor={anchor}, query='{query}', on_anchor={on_anchor}"
+        )
+
+        media_id = None
+        try:
             if query == "fav":
-                media_ids, _ = backend.db.query_fav_videos()
-                media_ids = media_ids[::-1]
-                idx = idx % len(media_ids) if len(media_ids) > 0 else 0
-                if len(media_ids) == 0:
-                    return {
-                        "status": "error",
-                        "message": f"No video found for query '{query}'.",
-                    }
-                media_id = media_ids[idx]
-            elif re.match(r"[\w.\-]+@\w+", query):
-                media_ids, _ = backend.db.query_video_by_uid(query, idx, 1)
-                if len(media_ids) == 0:
-                    return {
-                        "status": "error",
-                        "message": f"No video found for query '{query}'.",
-                    }
-                media_id = media_ids[0]
-            else:
-                media_ids, _ = backend.db.query_post_by_text(
-                    query, idx, 1, include="video"
+                media_id, count = db.get_a_video(
+                    anchor=anchor, on_anchor=on_anchor, sort_type=sort_type, fav=True
                 )
-                if len(media_ids) == 0:
-                    return {
-                        "status": "error",
-                        "message": f"No video found for query '{query}'.",
-                    }
-                media_id = media_ids[0]
-        else:
-            if backend.db.get_video_count() == 0:
-                return {
-                    "status": "error",
-                    "message": f"No video found.",
-                }
-            rowid = idx * 1234567 % backend.db.get_video_count()
-            # rowid = idx % backend.db.get_video_count()
-            media_id = backend.db.get_a_video(rowid + 1)
-            if media_id and len(media_id) > 0:
-                media_id = media_id[0][0]
+            elif user_name and type:
+                media_id, count = db.get_a_video(
+                    anchor=anchor, on_anchor=on_anchor, sort_type=sort_type, uid=uid
+                )
+            elif backend.db.get_video_count() == 0:
+                media_id, count = None, 0
             else:
-                return {
-                    "status": "error",
-                    "message": f"No video found.",
-                }
+                media_id, count = backend.db.get_a_video(
+                    anchor=anchor, on_anchor=on_anchor, sort_type=sort_type
+                )
+        except Exception as e:
+            logger.log(f"Error in get_a_video: {e}", type="error")
+            logger.log(traceback.format_exc(), type="error")
+            media_id, count = None, 0
+            if args.debug:
+                return jsonify(
+                    {"status": "error", "message": f"Error: {traceback.format_exc()}"}
+                )
+        if not media_id:
+            return {
+                "status": "error",
+                "message": f"No video found.",
+            }
         media = backend.Media(media_id, None, None, None)
         media.load_from_db()
         post = backend.Post(media.post_id, None, None)
@@ -1352,6 +1442,8 @@ def build_app():
         user = backend.User(post.user_name, post.type)
         user.load_from_db()
         data = {
+            "status": "ok",
+            "message": "",
             "url": posixpath.join(
                 "/", config.url_base, "file", post.type, post.user_name, media.file_name
             ),
@@ -1425,7 +1517,7 @@ def build_app():
             "nav.html",
             current_page=0,
             current_q="",
-            current_url=posixpath.join("/", config.url_base, "settings"),
+            current_url="",
             max_page=0,
             content=setting_frag,
             section="settings",
@@ -1433,6 +1525,46 @@ def build_app():
             shorts_decoration="",
             shorts_icon="",
         )
+
+    @app.route(
+        posixpath.join("/", config.url_base, "test"),
+        methods=["GET", "POST"],
+    )
+    @check_auth()
+    def _test_page():
+        if request.method == "GET":
+            return render_template(
+                "test.html",
+                url_base=config.url_base,
+            )
+        else:
+            data = request.get_json()
+            test_cat = data.get("test_cat", "")
+            logger.log(f"Received test data: {data}", verbose=3)
+            try:
+                if test_cat == "embbed_hyperlink":
+                    text = data.get("text", "")
+                    type_ = data.get("type", "x")
+                    rendered = utils.embed_hyperlink(type_, text)
+                    return jsonify({"status": "ok", "result": rendered})
+                elif test_cat == "bbcode":
+                    text = data.get("text", "")
+                    rendered = utils.render_bbcode(text)
+                    return jsonify({"status": "ok", "result": rendered})
+                elif test_cat == "tokenize_text":
+                    text = data.get("text", "")
+                    tokens = utils.tokenize_text(text)
+                    return jsonify({"status": "ok", "result": tokens})
+                else:
+                    return jsonify(
+                        {"status": "error", "message": "Unknown test category."}
+                    )
+            except Exception as e:
+                logger.log(f"Error in test API: {e}", type="error")
+                logger.log(traceback.format_exc(), type="error")
+                return jsonify(
+                    {"status": "error", "message": f"Error: {traceback.format_exc()}"}
+                )
 
     @app.route(posixpath.join("/", config.url_base, "api", "favs"))
     @check_auth()
@@ -1558,9 +1690,10 @@ def build_app():
         return render_template(
             "logs.html", log_lines=log_lines, url_base=config.url_base
         )
-    
 
-    @app.route(posixpath.join("/", config.url_base, "api", "upload_cookies"), methods=["POST"])
+    @app.route(
+        posixpath.join("/", config.url_base, "api", "upload_cookies"), methods=["POST"]
+    )
     @check_auth(required_role=utils.ROLE_ADMIN)
     def _api_upload_cookies():
         file = request.files["cookies"]
@@ -1572,7 +1705,10 @@ def build_app():
         elif type == "fa":
             save_path = "fadl/cookies.txt"
         else:
-            return {"status": "error", "message": "Cookie upload not supported for this type."}
+            return {
+                "status": "error",
+                "message": "Cookie upload not supported for this type.",
+            }
         # check length of file, should not be too large
         file.seek(0, os.SEEK_END)
         file_length = file.tell()
@@ -1583,6 +1719,28 @@ def build_app():
         file.save(save_path)
         logger.log(f"Cookies for {type} uploaded and saved to {save_path} by admin.")
         return {"status": "ok", "message": f"Cookies for {type} uploaded successfully."}
+
+    @app.route(posixpath.join("/", config.url_base, "api", "rescan"))
+    @check_auth(required_role=utils.ROLE_ADMIN)
+    def _api_rescan():
+        full = request.args.get("full", "0") == "1"
+        backend.scan_for_users("x")
+        backend.scan_for_users("bsky")
+        backend.scan_for_users("reddit")
+        backend.scan_for_users("fa")
+        backend.scan_for_users("patreon")
+        return {"status": "ok", "message": "Rescan completed."}
+
+    @app.route(posixpath.join("/", config.url_base, "api", "inspect_post/<post_id>"))
+    @check_auth()
+    def _api_inspect_post(post_id):
+        post_rows = backend.db.query_rows(
+            selected_table="posts", key="post_id", value=post_id, ignore_cache=True
+        )
+        if not post_rows:
+            return {"status": "error", "message": f"Post {post_id} not found."}
+        post_row = post_rows[0]
+        return {"status": "ok", "message": "", "post": post_row}
 
     @app.route(posixpath.join("/", config.url_base, "cache_proxy", "<path:subpath>"))
     @check_auth()
@@ -1599,6 +1757,8 @@ def build_app():
             subpath = subpath.replace("%3D", "=")
         if "furaffinity.net" in subpath:
             filename = subpath.split("/")[-1]
+        elif "patreon.com" in subpath:
+            subpath = quote(subpath)
         else:
             filename = utils.filter_ascii("_".join(subpath.split("/")))
         subpath = "https://" + subpath
@@ -1613,7 +1773,9 @@ def build_app():
             try:
                 r = utils.get(subpath)
                 if r.status_code != 200:
-                    raise Exception(f"Failed to fetch {subpath}, status code: {r.status_code}")
+                    raise Exception(
+                        f"Failed to fetch {subpath}, status code: {r.status_code}"
+                    )
                 bin_ = r.content
                 if len(bin_) < 1024:
                     raise Exception("Too small")
@@ -1634,17 +1796,19 @@ def build_app():
     return app
 
 
-def init(skip_scan):
-    if not skip_scan:
+def init(skip_scan, skip_scan_users):
+    if not skip_scan_users:
         backend.scan_for_users("x")
         backend.scan_for_users("bsky")
         backend.scan_for_users("reddit")
         backend.scan_for_users("fa")
-
+        backend.scan_for_users("patreon")
+    if not skip_scan:
         backend.scan_for_posts("x")
         backend.scan_for_posts("bsky")
         backend.scan_for_posts("reddit")
         backend.scan_for_posts("fa")
+        backend.scan_for_posts("patreon")
     backend.db.commit()
     backend.all_users = backend.get_users()
     logger.log("Scan finished.")
@@ -1666,10 +1830,10 @@ def signal_handler(signal, frame):
     sys.exit(0)
 
 
-def wsgi_app(skip_scan=False, config_file="config.json"):
+def wsgi_app(skip_scan=False, skip_scan_users=False, config_file="config.json"):
     print("Starting app with wsgi_app()")
     config.read_config(config_file)
-    init(skip_scan)
+    init(skip_scan, skip_scan_users)
     app = build_app()
     logger.log(f"app is ready at: http://{config.host}:{config.port}{config.url_base}")
     return app
@@ -1704,7 +1868,7 @@ if args.monitor_timeline:
 logger.log("Ready.")
 
 if __name__ == "__main__":
-    init(args.skip_scan)
+    init(args.skip_scan, args.skip_scan_users)
     app = build_app()
     logger.log(f"app is ready at: http://{config.host}:{config.port}{config.url_base}")
     app.run(host=config.host, port=config.port, debug=args.debug)

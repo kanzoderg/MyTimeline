@@ -6,5 +6,4 @@ tqdm
 bs4
 gunicorn
 gallery-dl
-pympler
-atproto
+psutil

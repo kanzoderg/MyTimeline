@@ -15,7 +15,8 @@
         "x": "./downloads/twitter",
         "bsky": "./downloads/bluesky",
         "reddit": "./downloads/reddit",
-        "fa": "./downloads/furaffinity"
+        "fa": "./downloads/furaffinity",
+        "patreon": "./downloads/patreon" 
     },
     "cache_path": "~/.cache/mt",
     "thumbnail_size": 600,
@@ -26,5 +27,6 @@
     "user_pin": "1234", 
     "admin_pin": "1234", 
     "super_session_key": "", 
-    "log_file": "./log.txt"
+    "log_file": "./log.txt",
+    "allow_external_url_preview": true
 }
