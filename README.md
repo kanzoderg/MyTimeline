@@ -45,4 +45,4 @@ options:
 
 ## Screenshot
 
-<img src="screenshots/1.png" height="300">
+<img src="screenshots/1.png">
