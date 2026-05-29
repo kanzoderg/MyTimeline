@@ -27,7 +27,6 @@ function resize_windows(e) {
     }
 }
 
-
 function sync_window_visibility() {
     if (window1.getBoundingClientRect().width < min_active_window_width) {
         window1_iframe.style.opacity = 0.3;
@@ -192,14 +191,18 @@ function enter_fullscreen() {
 }
 
 function go_tl() {
+    inf_scroll = localStorage.getItem("inf_scroll") === "true";
     page = localStorage.getItem("tl_current_page") || 1;
+    if (inf_scroll) {
+        page = 1;
+    }
     sort_type = localStorage.getItem("tl_current_sort_type") || "new";
     tab = localStorage.getItem("tl_current_tab") || "posts";
     url = `${url_base}/tl?tab=${tab}&sort_type=${sort_type}&p=${page}`;
     show_content(url, 2);
 }
 
-function go_userlist(){
+function go_userlist() {
     page = localStorage.getItem("ul_current_page") || 1;
     sort_type = localStorage.getItem("ul_current_sort_type") || "new";
     url = `${url_base}/userlist?sort_type=${sort_type}&p=${page}`;
@@ -237,20 +240,26 @@ window.addEventListener('beforeunload', function () {
 
 // restore iframe src and scroll position on load
 window.addEventListener('load', function () {
-    // window1
-    const savedSrc1 = localStorage.getItem('mt_iframeSrc1');
-    const savedScrollPosition1 = localStorage.getItem('mt_iframeScrollPosition1');
     const savedTimestamp1 = localStorage.getItem('mt_iframeTimestamp1');
-    const savedWindow1Percent = localStorage.getItem('mt_window1_percent');
+    const savedTimestamp2 = localStorage.getItem('mt_iframeTimestamp2');
     const now = Date.now();
     if (savedTimestamp1 && now - savedTimestamp1 > 20 * 1000) {
         localStorage.removeItem('mt_iframeSrc1');
         localStorage.removeItem('mt_iframeScrollPosition1');
         localStorage.removeItem('mt_iframeTimestamp1');
         localStorage.removeItem('mt_window1_percent');
-        window1_iframe.src = url_base + "/userlist";
-        return;
     }
+    if (savedTimestamp2 && now - savedTimestamp2 > 20 * 1000) {
+        localStorage.removeItem('mt_iframeSrc2');
+        localStorage.removeItem('mt_iframeScrollPosition2');
+        localStorage.removeItem('mt_iframeTimestamp2');
+        localStorage.removeItem('mt_window2_percent');
+    }
+
+    // window1
+    const savedSrc1 = localStorage.getItem('mt_iframeSrc1');
+    const savedScrollPosition1 = localStorage.getItem('mt_iframeScrollPosition1');
+    const savedWindow1Percent = localStorage.getItem('mt_window1_percent');
     if (savedSrc1) {
         window1_iframe.src = savedSrc1;
         window1_iframe.onload = function () {
@@ -259,18 +268,13 @@ window.addEventListener('load', function () {
             window1_iframe.onload = null;
         }
     } else {
-        window1_iframe.src = url_base + "/userlist";
+        url = `${url_base}/userlist`;
+        window1_iframe.src = url;
     }
+
     // window2
     const savedSrc2 = localStorage.getItem('mt_iframeSrc2');
     const savedScrollPosition2 = localStorage.getItem('mt_iframeScrollPosition2');
-    const savedTimestamp2 = localStorage.getItem('mt_iframeTimestamp2');
-    if (savedTimestamp2 && now - savedTimestamp2 > 20 * 1000) {
-        localStorage.removeItem('mt_iframeSrc2');
-        localStorage.removeItem('mt_iframeScrollPosition2');
-        localStorage.removeItem('mt_iframeTimestamp2');
-        return;
-    }
     if (savedSrc2) {
         window2_iframe.src = savedSrc2;
         window2_iframe.onload = function () {

@@ -1,0 +1,41 @@
+body {
+    --text-color: #000;
+    --text-color-alt: #000b;
+    --accent-color: rgb(255, 0, 111);
+    --accent-color-dark: rgb(126, 0, 57);
+    --accent-color-light: rgb(43, 188, 255);
+    --internal-link-color: rgb(68, 174, 255);
+    --external-link-color: rgb(255, 150, 70);
+    --bg-color: #ffffff;
+    --bg-with-alpha: rgba(255, 255, 255, 0.7);
+    --bg-with-alpha-hover-dark: rgba(255, 255, 255, 0.9);
+    --bg-with-alpha-hover-light: rgba(0, 0, 0, 0.06);
+    --bg-color-alt: #ffffff;
+    --bg-color-alt-hover: #f0f0f0;
+    --bg-light: rgba(0, 0, 0, 0.2);
+    --border-color: #0003;
+    --border-color-hover: #0005;
+    --border-color-alt: #0003;
+    --border-color-alt-hover: #0003;
+}
+
+* {
+    transition: none !important;
+}
+
+#background_banner {
+    display: none;
+}
+
+.card_footer_item img,
+.inline_icon,
+.card_embed_img,
+.attachment_icon,
+.float_btn img,
+.menu_item img,
+.nav_item img,
+.card_link img,
+.user_header_button img,
+.tiny_btn img {
+    filter: invert(1);
+}

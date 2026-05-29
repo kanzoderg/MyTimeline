@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
     <link rel="stylesheet" href="{{url_base}}/css/style.css" />
     <link rel="stylesheet" id="landscape_style" href="{{url_base}}/css/landscape.css" disabled />
+    <link rel="stylesheet" href="{{url_base}}/css/light_mode.css" disabled />
     <link rel="manifest" href="{{url_base}}/mt.webmanifest" crossorigin="use-credentials">
     <meta name="mobile-web-app-capable" content="yes">
     <meta http-equiv="Content-Security-Policy"
@@ -76,19 +77,22 @@
         </div>
         {% endif %}
         <div class="page_control_warp translucent">
-            <div class="page_control_item" id="btn_prev" onclick="prev_page()">
+            <div class="page_control_item tiny_btn translucent" id="inf_hint"
+                onclick="toast('You are in infinite scroll mode. You can toggle it in settings.')">
+                <img src="{{url_base}}/img/scroll.svg" style="transform: scale(0.7);" />
+            </div>
+            <div class="page_control_item tiny_btn" id="btn_prev" onclick="prev_page()">
                 <img src="{{url_base}}/img/left.svg" />
             </div>
             <div class="page_control_item" id="page_text" onclick="go_page()">
-                <span style="font-size: 0.9rem;">{{ current_page }}</span> / <span style="font-size: 0.7rem;"> {{
-                    max_page }} </span>
+                {{ current_page }} / {{ max_page }}
             </div>
-            <div class="page_control_item" id="btn_next" onclick="next_page()">
+            <div class="page_control_item tiny_btn" id="btn_next" onclick="next_page()">
                 <img src="{{url_base}}/img/right.svg" />
             </div>
         </div>
     </div>
-    <button class="tiny_btn translucent" onclick="scrollToTop()" style="right: 0.5rem;">
+    <button class="tiny_btn translucent" onclick="scrollToTop()" style="position: fixed; right: 0.5rem; rotate: 90deg;">
         <img src="{{url_base}}/img/left.svg" />
     </button>
 
@@ -105,21 +109,27 @@
         {% endif %}
     </div>
     {% endif %}
-    
+
     <div class="container_outer" id="container_outer" autofocus>
-        <div class="container" id="container" {% if adjust_padding_top %} style="padding-top: {{adjust_padding_top}};"{% endif %}>
+        <div class="container" id="container" {% if adjust_padding_top %} style="padding-top: {{adjust_padding_top}};"
+            {% endif %}>
             {{ content | safe }}
         </div>
     </div>
 
-    <div class="float_card" id="float_card"></div>
+    <iframe class="overlay" id="overlay" src="about:blank"></iframe>
     <div id="alt_text">
         <div id="alt_text_text"></div>
         <a id="close_alt_btn" class="float_btn" onclick="hide_alt()">
             <img src="{{url_base}}/img/cross.svg" style="transform: scale(0.8);">
         </a>
     </div>
-    <div id="toast_div">Testing testing 123456 test.</div>
+
+    <div id="toast_warp">
+        <div id="toast_div">
+            Testing testing 123456 test.
+        </div>
+    </div>
 
     <script>
         var current_page = {{ current_page }};
@@ -128,18 +138,26 @@
         var current_url = "{{current_url|safe}}";
         var url_base = "{{url_base}}";
         var sort_type = "{{sort_type}}";
-        {% if section=='tl' %}
-        localStorage.setItem("tl_current_page", "{{current_page}}");
-        localStorage.setItem("tl_current_sort_type", "{{sort_type}}");
-        localStorage.setItem("tl_current_tab", "{{current_tab}}");
-        {% elif section=='userlist' %}
-        localStorage.setItem("ul_current_page", "{{current_page}}");
-        localStorage.setItem("ul_current_sort_type", "{{sort_type}}");
-        {% endif %}
+        var inf_scroll = localStorage.getItem("inf_scroll") === "true";
+        var tab = "{{tab}}";
+        var section = "{{section}}";
+        if (section == 'tl') {
+            localStorage.setItem("tl_current_page", "{{current_page}}");
+            localStorage.setItem("tl_current_sort_type", "{{sort_type}}");
+            localStorage.setItem("tl_current_tab", "{{current_tab}}");
+        }
+        else if (section == 'userlist') {
+            localStorage.setItem("ul_current_page", "{{current_page}}");
+            localStorage.setItem("ul_current_sort_type", "{{sort_type}}");
+            localStorage.setItem("ul_current_tab", "{{current_tab}}");
+        }
+        window.addEventListener("load", function () {
+            show_navigation();
+        });
     </script>
     <script src="{{url_base}}/js/noreferer.js"></script>
+    <script src="{{url_base}}/js/helper.js"></script>
     <script src="{{url_base}}/js/script.js"></script>
-    <script src="{{url_base}}/js/logs.js"></script>
 </body>
 
 </html>

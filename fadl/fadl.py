@@ -6,29 +6,40 @@ import re, os, time, json
 import argparse
 from bs4 import BeautifulSoup as Soup
 
+headers = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+    "Referer": "https://www.furaffinity.net/",
+}
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-arg_parser = argparse.ArgumentParser(description="Furaffinity Downloader")
-arg_parser.add_argument("url")
-arg_parser.add_argument(
-    "-o", "--output", default="./downloads", help="Output directory"
+parser = argparse.ArgumentParser(description="Furaffinity Downloader")
+parser.add_argument("url", help="URL of the Furaffinity user, post or journal to download")
+parser.add_argument(
+    "--proxy", default="", help="Proxy URL (e.g., http://127.0.0.1:10808)"
 )
-arg_parser.add_argument("-f", "--force", action="store_true", help="Force fetch all.")
-arg_parser.add_argument(
+parser.add_argument(
+    "-o", "--output", help="Directory to save downloaded content", default="downloads"
+)
+parser.add_argument("-f", "--force", action="store_true", help="Force fetch all.")
+parser.add_argument(
     "--cookies",
     default=os.path.join(current_dir, "cookies.txt"),
     help="Cookies for authentication",
 )
-arg_parser.add_argument(
+parser.add_argument(
     "--user-agent",
     default="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
     help="Custom User-Agent header",
 )
-arg_parser.add_argument(
-    "--proxy", default="", help="Proxy URL (e.g., http://127.0.0.1:10808)"
+parser.add_argument(
+    "-ni",
+    "--no-interactive",
+    help="Run in non-interactive mode (no progress bars, minimal output)",
+    action="store_true",
 )
 
-args = arg_parser.parse_args()
+args = parser.parse_args()
 
 cookies = {}
 if args.cookies and os.path.exists(args.cookies):
@@ -44,26 +55,7 @@ if args.cookies and os.path.exists(args.cookies):
 
 # print("cookies:", cookies)
 
-headers = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br, zstd",
-    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,zh-TW;q=0.7",
-    "cache-control": "max-age=0",
-    "Priority": "u=0, i",
-    "Referer": "https://www.furaffinity.net/",
-    "sec-ch-ua-arch": '"x86"',
-    "sec-ch-ua-bitness": '"64"',
-    "sec-ch-ua-full-version-list": '"Chromium";v="146.0.0.0", "Not-A.Brand";v="24.0.0.0", "Brave";v="146.0.0.0"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-model": '""',
-    "sec-ch-ua-platform": '"Linux"',
-    "sec-ch-ua-platform-version": '""',
-    "sec-fetch-dest": "document",
-    "sec-fetch-mode": "navigate",
-    "sec-fetch-site": "same-origin",
-    "sec-fetch-user": "?1",
-    "User-Agent": args.user_agent,
-}
+headers["User-Agent"] = args.user_agent
 
 # print("Using headers:", headers)
 
@@ -90,7 +82,9 @@ def get(url):
             if attempt == retry_count - 1:
                 print(f"All {retry_count} attempts failed for URL: {url}")
                 print("=" * 50)
-                print("FA might be currently under `Under Attack` mode, which blocks requests that look like bots. Please pass the captcha in your browser, then export the cookies.txt and upload it. If you are already using cookies, try refreshing them. If the problem persists, you may need to wait until the attack mode is lifted.")
+                print(
+                    "FA might be currently under `Under Attack` mode, which blocks requests that look like bots. Please pass the captcha in your browser, then export the cookies.txt and upload it. If you are already using cookies, try refreshing them. If the problem persists, you may need to wait until the attack mode is lifted."
+                )
                 print("=" * 50)
                 raise
 
@@ -159,8 +153,12 @@ def put_user_info(user, no_overwrite=False):
         json.dump(user_info, f)
     print(f"Saved user info for {user}")
 
+
 def is_image_url(url):
-    return url.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".avif"))
+    return url.lower().endswith(
+        (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".avif")
+    )
+
 
 class Item:
     def __init__(
@@ -241,7 +239,9 @@ class Item:
             )
         ):
             print(f"Item {self.id_} is restricted to registered users only.")
-            print("Check your cookies and make sure you have access to this item in your browser.")
+            print(
+                "Check your cookies and make sure you have access to this item in your browser."
+            )
             self.available = False
             return
         if self.category in ["gallery", "scraps"]:
@@ -262,7 +262,11 @@ class Item:
                     return
             put_user_info(self.user)
             scan_existing_items(self.user)
-            if self.id_ in exsisting_items and self.category in ["gallery", "scraps"] and not args.force:
+            if (
+                self.id_ in exsisting_items
+                and self.category in ["gallery", "scraps"]
+                and not args.force
+            ):
                 print(f"l266: Already exists: [{ self.id_}] {self.user}")
                 self.already_exists = True
                 return
@@ -277,15 +281,15 @@ class Item:
                 "%Y-%m-%d %H:%M:%S", time.localtime(self.timestamp)
             )
             self.description = soup.find(
-                class_="submission-description"
+                class_="submission-description-text"
             ).decode_contents()
             for tag_elem in soup.find_all(class_="tags"):
                 tag_text = tag_elem.text.strip()
                 self.tags.append(tag_text)
-            self.views = soup.find(class_="views").span.text.strip()
-            self.comments = soup.find(class_="comments").span.text.strip()
-            self.favorites = soup.find(class_="favorites").span.text.strip()
-            self.rating = soup.find(class_="rating").span.text.strip()
+            self.views = soup.find(title="Views").div.text.strip()
+            self.comments = soup.find(title="Comments").div.text.strip()
+            self.favorites = soup.find(title="Favorites").div.text.strip()
+            self.rating = "N/A"
         elif self.category == "journals":
             self.user = (
                 soup.find(class_="c-usernameBlock__displayName")["href"]

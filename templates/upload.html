@@ -8,16 +8,33 @@
 </head>
 <body>
     <div class="container small">
-        <h1>Upload File</h1>
-        
-        <div class="post-id-display">
+        <h1>Upload File or Link</h1>
+        <h3>
             Uploading to Post: <strong>{{ post_id }}</strong>
-        </div>
+        </h3>
         
         <form id="uploadForm" method="post" enctype="multipart/form-data">
+
+            <div class="form-group">
+                <div class="post-id-display">
+                    Add a link to the post.
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="urlInput">Add Link to Post</label>
+                <input type="url" id="urlInput" name="url" placeholder="https://example.com/...">
+            </div>
+
+            <div class="form-group">
+                <div class="post-id-display">
+                    Or upload a file instead.
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="fileInput">Select File</label>
-                <input type="file" id="fileInput" name="file" required>
+                <input type="file" id="fileInput" name="file">
             </div>
             
             <div class="button-group">

@@ -4,39 +4,67 @@
     <img src="{{url_base}}/img/right.svg" onclick="url_input()" />
 </div>
 <div class="search_checkboxes">
-    <button id="paste_from_clipboard" class="big_btn translucent" onclick="paste_from_clipboard()">Paste from
-        Clipboard</button>
-    <br>
+    <button id="paste_from_clipboard" class="big_btn translucent" onclick="paste_from_clipboard()">
+        <img src="{{url_base}}/img/logs.svg" class="inline_icon" style="margin-right: 0.3rem;">
+        Paste from Clipboard
+    </button>
+    <!-- <br>
     <input type="checkbox" id="full" name="full" value="full" style="border-radius: 1rem;">
     <label for="full">full <span style="font-size: 0.6rem; color: #aaa;">(don't stop even when exsisting posts
             encoutered)</span></label>
     <br>
     <input type="checkbox" id="media_only" name="media_only" value="media_only">
-    <label for="media_only">media only</label>
+    <label for="media_only">media only</label> -->
+</div>
+
+<div class="menu_group">
+    <div class="menu_item" id="dl_full_toggle" onclick="toggle_value('dl_full_toggle','dl_full')">
+        <img src="{{url_base}}/img/select.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Full Download</div>
+            <div class="menu_item_desc_text">Don't stop downloading when existing posts are encountered, will increase
+                api usage, might cause rate limiting.</div>
+        </div>
+        <div class="menu_toggle">
+            <div class="menu_toggle_thumb"></div>
+        </div>
+    </div>
+    <div class="menu_item" id="dl_media_toggle" onclick="toggle_value('dl_media_toggle','dl_media')">
+        <img src="{{url_base}}/img/media.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Media Only</div>
+            <div class="menu_item_desc_text">Download only media files</div>
+        </div>
+        <div class="menu_toggle">
+            <div class="menu_toggle_thumb"></div>
+        </div>
+    </div>
 </div>
 
 <div class="msg" id="msg">
 </div>
 <div class="current" id="current">
 </div>
-<div class="interrupt_btn big_btn translucent" onclick="interrupt_download()">Interrupt Download</div>
+<div class="interrupt_btn big_btn translucent" onclick="interrupt_download()">
+    <img src="{{url_base}}/img/stop.svg" class="inline_icon" style="margin-right: 0.3rem;">
+    Interrupt Download
+</div>
 <div class="queue" id="queue">
 </div>
-<div id="logs"></div>
+<div id="logs" style="height: 20rem;"></div>
 
 <script>
-    setTimeout(() => {
+    window.addEventListener('load', function () {
+        init_toggle('dl_full_toggle', 'dl_full');
+        init_toggle('dl_media_toggle', 'dl_media');
         add_job("", 0, 0)
-    }, 500)
-    setInterval(() => {
-        add_job("", 0, 0)
-    }, 2000);
-
-    setTimeout(() => {
         update_logs(20, true)
-    }, 500)
+    });
+
     setInterval(() => {
+        add_job("", 0, 0)
         update_logs(20, false)
-    }, 2000)
+    }, 3000);
+
 </script>
 <script src="{{url_base}}/js/noreferer.js"></script>

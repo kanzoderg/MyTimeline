@@ -1,10 +1,17 @@
 <div class="search_bar translucent" id="search_bar">
     <input type="text" name="q" placeholder="Search" id="search_bar_input" onkeydown="searchbar_on_enter(event,search)"
-        onkeyup="update_search_q_placeholders()" onfocus="show_search_history()" onfocusout="hide_search_history()"
+        onkeyup="update_search_q_placeholders();update_search_suggestions_debounced();" onfocus="show_search_history()" onfocusout="hide_search_history()"
         autocomplete="off" />
     <img src="{{url_base}}/img/search.svg" onclick="search()" />
 </div>
 <div class="search_float translucent" id="search_float">
+    <div class="search_history" id="search_suggestions">
+        <div class="search_history_list" id="search_suggestions_list">
+            <div class="search_suggestion_item">test1</div>
+            <div class="search_suggestion_item">test2</div>
+            <div class="search_suggestion_item">test3</div>
+        </div>
+    </div>
     <div class="search_history" id="search_history">
         <div class="search_history_list" id="search_history_list">
         </div>

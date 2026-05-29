@@ -1,0 +1,37 @@
+<a class="user_card" href="{{url_base}}/user/{{user.type}}/{{user.user_name}}"
+    data-url="{{url_base}}/user/{{user.type}}/{{user.user_name}}" onclick="show_content_in_frame(event, this);"
+    id="u{{user.uid}}">
+    <div class="user_select_toggle" onclick="select_user('{{user.uid}}', '{{tab}}');return false;" id="t{{user.uid}}" data-group="{{group_id}}"></div>
+    <img src="{{url_base}}/banner/{{user.type}}/{{user.user_name}}" class="user_banner"></img>
+    <div class="user_card_header">
+        <img class="user_card_header_img" src="{{url_base}}/avatar/{{user.type}}/{{user.user_name}}" />
+        <div class="user_card_header_txt">
+            {% if user.type in ['x', 'bsky'] %}
+            <div class="user_card_header_title">{{user.nick}}</div>
+            <div class="user_card_header_date">@{{user.user_name}}</div>
+            {% elif user.type == 'reddit' %}
+            <div class="user_card_header_title">r/{{user.user_name}}</div>
+            {% elif user.type == 'fa' %}
+            <div class="user_card_header_title">{{user.nick}}</div>
+            <div class="user_card_header_date">~ {{user.user_name}}</div>
+            {% elif user.type == 'patreon' %}
+            <div class="user_card_header_title">{{user.nick}}</div>
+            <div class="user_card_header_date">on {{user.extra_data.get("service", "(?)")}}</div>
+            {% else %}
+            <div class="user_card_header_title">{{user.nick}}</div>
+            <div class="user_card_header_date">{{user.user_name}}</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="user_card_body_text">
+        {{user.description}}
+    </div>
+    <div class="user_card_update_time">
+        Updated: {{user.get_update_time_str()}}
+    </div>
+    {% if user.flagged %}
+    <div class="flagged" style="position: absolute; right: 0.5rem; bottom: 0.5rem;">
+        <img src="{{url_base}}/img/flagged.svg" />
+    </div>
+    {% endif %}
+</a>

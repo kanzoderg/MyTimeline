@@ -13,19 +13,24 @@
             ">": "-"
         },
         "twitter": {
+            "include": [
+                "with-replies"
+            ],
             "text-tweets": true,
-            "replies": true,
+            "replies": "self",
             "postprocessors": [
                 {
                     "name": "metadata",
                     "event": "post",
                     "filename": "{tweet_id}.json"
                 }
-            ]
+            ],
+            "file-filter": "author['id'] == user['id']",
+            "post-filter": "author['id'] == user['id']"
         },
         "bluesky": {
             "include": [
-                "posts"
+                "replies"
             ],
             "metadata": "user",
             "postprocessors": [

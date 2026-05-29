@@ -1,0 +1,34 @@
+<div class="tiny_card fade-text-right" href='{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}' onclick="show_in_overlay(this)">
+    <div class="tiny_card_deco">
+        <img src="{{url_base}}/img/{{post.type}}.svg" />
+    </div>
+    <div class="tiny_card_body fade-text">
+        <div class="tiny_card_header">
+            <img class="tiny_card_header_img" src="{{url_base}}/avatar/{{post.type}}/{{post.user_name}}" />
+            <div class="tiny_card_header_txt">
+                <div class="tiny_card_nickname">{{post.user.nick[:20]}}</div>
+                {% if post.type in ['x', 'bsky'] %}
+                <div class="tiny_card_subheader_txt">@{{post.user.user_name}}</div>
+                {% elif post.type == 'reddit' %}
+                <div class="tiny_card_subheader_txt">u/{{post.real_user}}</div>
+                {% elif post.type == 'fa' %}
+                <div class="tiny_card_subheader_txt">~ {{post.user.user_name}}</div>
+                {% else %}
+                <div class="tiny_card_subheader_txt">{{post.user.user_name}}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="tiny_card_body_txt">{{post.text_content_rendered | safe}}</div>
+    </div>
+
+    {% if post.medias %}
+    <div class="tiny_media_container">
+        {% for media in post.medias[:4] %}
+        {% if media.isimage %}
+        <img class="tiny_media"
+            src="{{url_base}}/thumb/{{post.type}}/{{post.user_name}}/thumb_{{media.file_name}}?size=600" />
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

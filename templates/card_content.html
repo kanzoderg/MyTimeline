@@ -1,10 +1,10 @@
 <div class="card_header">
-    <a href="{{url_base}}/user/{{post.type}}/{{post.user_name}}" {%if post.user_name==user_name
+    <a class="user_avatar" href="{{url_base}}/user/{{post.type}}/{{post.user_name}}" {%if post.user_name==user_name
         %}onclick="scrollToTop()" {% endif %}>
         <img class="card_header_img" src="{{url_base}}/avatar/{{post.type}}/{{post.user_name}}" />
         <div class="header_txt">
             {% if post.type in ['x', 'bsky'] %}
-            <div class="card_header_title">{{user.nick[:20]}}
+            <div class="card_header_title">{{post.user.nick[:20]}}
                 <span class="card_header_name">@{{post.user_name}}</span>
             </div>
             {% elif post.type == 'reddit' %}
@@ -13,56 +13,77 @@
                     class="card_header_name reddit_real_user">u/{{post.real_user}}</a>
             </div>
             {% elif post.type == 'fa' %}
-            <div class="card_header_title">{{user.nick[:20]}}
+            <div class="card_header_title">{{post.user.nick[:20]}}
                 <span class="card_header_name">~ {{post.user_name}}</span>
             </div>
             {% elif post.type == 'patreon' %}
-            <div class="card_header_title">{{user.nick[:20]}}
-                <span class="card_header_name">on patreon</span>
+            <div class="card_header_title">{{post.user.nick[:20]}}
+                <span class="card_header_name">on {{user.extra_data.get("service", "(?)")}}</span>
+            </div>
+            {% else %}
+            <div class="card_header_title">{{post.user.nick[:20]}}
+                <span class="card_header_name">{{post.user_name}}</span>
             </div>
             {% endif %}
             <div class="card_header_date">{{post.get_time_str()}}</div>
         </div>
     </a>
 </div>
+
 <div class="card_body">
-    <!-- {% if post.isreply %}
-        <a href="{{post.url}}" target="_blank">
-            <img class="reply_icon" src="{{url_base}}/img/reply.svg" />
-        </a>
-        {% endif %} -->
+
+    {% if post.text_content_rendered %}
     <div class="card_body_text" post-url="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
-        {{post.text_content | safe}}
+        {{post.text_content_rendered | safe}}
     </div>
+    {% endif %}
+
 
     <!-- media -->
     {% if post.medias %}
 
-    {% if post.medias|length == 1 %}
-    {% set container_type = 'media_container_one' %}
-    {% set thumb_size = 1280 %}
-    {% elif post.medias|length == 2 %}
-    {% set container_type = 'media_container_two' %}
-    {% set thumb_size = 800 %}
-    {% elif post.medias|length == 3 %}
-    {% set container_type = 'media_container_three' %}
-    {% set thumb_size = 800 %}
-    {% elif post.medias|length == 4 %}
-    {% set container_type = 'media_container_four' %}
-    {% set thumb_size = 800 %}
-    {% else %}
-    {% set container_type = 'media_container_many' %}
-    {% set thumb_size = 800 %}
+    <!-- jinja logic
+    {% if post.medias|length == 1 or (post.medias|length < 10 and post.post_id==highlight_post_id) %} 
+    {% set container_type='media_container_one' %} 
+    {% set thumb_size=1280 %} 
+    {% elif post.medias|length==2 %} 
+    {% set container_type='media_container_two' %} 
+    {% set thumb_size=800 %} 
+    {% elif post.medias|length==3 %} 
+    {% set container_type='media_container_three' %} 
+    {% set thumb_size=800 %} 
+    {% elif post.medias|length==4 %} 
+    {% set container_type='media_container_four' %} 
+    {% set thumb_size=800 %} 
+    {% else %} 
+    {% set container_type='media_container_many' %} 
+    {% set thumb_size=600 %} 
     {% endif %}
+    -->
+
     <div class="media_container {{container_type}}">
+        <!-- jinja logic
+        {% if detailed_view %}
+        {% set max_media = 9999 %}
+        {% else %}
+        {% set max_media = 24 %}
+        {% endif %}
         {% set media_cnt = namespace(value=0) %}
-        {% for media in post.medias %}
-        {% if media.isvideo %}
+        -->
+        {% for media in post.medias[:max_media] %}
+        {% if media_cnt.value == max_media-1 %}
+        <a class="more_media media_wrapper" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+            <img class="card_media"
+                src="{{url_base}}/thumb/{{post.type}}/{{post.user_name}}/thumb_{{post.medias[media_cnt.value].file_name}}?size={{thumb_size}}"
+                onload="img_loaded(this)" loading="lazy" />
+            <div class="more_media_text">+ {{ (post.medias | length) - media_cnt.value }}</div>
+        </a>
+        {% elif media.isvideo %}
         <a class="media_wrapper"
-            onclick="show_float_card(event,'{{url_base}}/fullscreen_card/{{post.type}}/{{post.user_name}}/{{post.post_id}}?idx={{media_cnt.value}}')"
-            class="video_thumbnail">
+            href='{{url_base}}/viewer/{{post.type}}/{{post.user_name}}/{{post.post_id}}?idx={{media_cnt.value}}'
+            onclick="show_in_overlay(this)" class="video_thumbnail">
             <img class="card_media" src="{{url_base}}/thumb/{{post.type}}/{{post.user_name}}/thumb_{{media.file_name}}"
-                onload="img_loaded(this)" />
+                onload="img_loaded(this)" loading="lazy" />
             <div class="video_icon">
                 <img src="{{url_base}}/img/play_w.svg" />
             </div>
@@ -71,10 +92,10 @@
             </div>
             <div class="file_size">{{media.get_size_str()}}</div>
         </a>
-        {% set media_cnt.value = media_cnt.value + 1 %}
         {% elif media.isaudio %}
         <a class="media_wrapper"
-            onclick="show_float_card(event,'{{url_base}}/fullscreen_card/{{post.type}}/{{post.user_name}}/{{post.post_id}}?idx={{media_cnt.value}}')">
+            href='{{url_base}}/viewer/{{post.type}}/{{post.user_name}}/{{post.post_id}}?idx={{media_cnt.value}}'
+            onclick="show_in_overlay(this)">
             <audio controls>
                 <source src="{{url_base}}/file/{{post.type}}/{{post.user_name}}/{{media.file_name}}">
                 Your browser does not support the audio element.
@@ -83,10 +104,11 @@
         </a>
         {% elif media.isimage %}
         <a class="media_wrapper"
-            onclick="show_float_card(event,'{{url_base}}/fullscreen_card/{{post.type}}/{{post.user_name}}/{{post.post_id}}?idx={{media_cnt.value}}')">
+            href='{{url_base}}/viewer/{{post.type}}/{{post.user_name}}/{{post.post_id}}?idx={{media_cnt.value}}'
+            onclick="show_in_overlay(this)">
             <img class="card_media"
                 src="{{url_base}}/thumb/{{post.type}}/{{post.user_name}}/thumb_{{media.file_name}}?size={{thumb_size}}"
-                onload="img_loaded(this)" />
+                onload="img_loaded(this)" loading="lazy" />
             {% if media.file_name.endswith('.gif') %}
             <div class="gif_icon thumb_deco">
                 <img src="{{url_base}}/img/gif.svg" />
@@ -100,21 +122,52 @@
             {% endif %}
             <div class="file_size">{{media.get_size_str()}}</div>
         </a>
-        {% set media_cnt.value = media_cnt.value + 1 %}
         {% elif media.isflash %}
-        <a class="media_wrapper" href="{{url_base}}/ruffle/{{post.type}}/{{post.user_name}}/{{media.file_name}}">
+        <a class="media_wrapper" href="{{url_base}}/ruffle/{{post.type}}/{{post.user_name}}/{{media.file_name}}"
+            onclick="show_in_overlay(this)">
             <img class="card_media" src="{{url_base}}/thumb/{{post.type}}/{{post.user_name}}/thumb_{{media.file_name}}"
-                style="object-fit: contain;background-color: black;" onload="img_loaded(this)" />
+                style="object-fit: contain;background-color: black;" onload="img_loaded(this)" loading="lazy" />
             <div class="video_icon" style="background: none;">
                 <img src="{{url_base}}/img/flash.svg" />
             </div>
             <div class="file_size">{{media.get_size_str()}}</div>
         </a>
         {% endif %}
+
+        {% set media_cnt.value = media_cnt.value + 1 %}
         {% endfor %}
     </div>
     {% endif %}
     <!-- media end -->
+
+
+    <!-- external link preview -->
+    {% if post.external_links %}
+    {% for external_link in post.external_links %}
+    <a class="link_preview {%if post.external_links| length != 1 %}link_preview_small{% endif %} card_embed" href="https://{{external_link.url}}" target="_blank">
+        {% if external_link.thumbnail %}
+        <img class="link_preview_thumbnail" onerror="this.style.display='none';"
+            src="{{url_base}}/cache_proxy/{{external_link.thumbnail}}">
+        {% endif %}
+        <div class="link_preview_text">
+            <div class="link_preview_title">
+                {{external_link.title or external_link.url}}
+            </div>
+            <div class="link_preview_desc">
+                {{external_link.description}}
+            </div>
+            <div class="link_preview_url">
+                <img src="{{url_base}}/cache_proxy/{{external_link.favicon}}"
+                    data-og-src="{{external_link.favicon}}"
+                    onerror="this.attributes['src'].value='{{url_base}}/img/globe.svg';" class="favicon" />
+                <span>{{external_link.clean_url}}</span>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+    {% endif %}
+    <!-- external link preview end -->
+
 
     <!-- attachments -->
     {% for atta in post.attachments %}
@@ -122,7 +175,7 @@
     <a href="{{url_base}}/text/{{post.type}}/{{post.user_name}}/{{atta.file_name}}" class="attachment_card card_embed">
         <img class="attachment_icon" src="{{url_base}}/img/book.svg" />
         <div class="attachment_txt">
-            <div class="attachment_name">{{unquote(atta.file_name)}}</div>
+            <div class="attachment_name">{{unquote(atta.file_name)}} ({{atta.get_size_str()}})</div>
         </div>
     </a>
     {% else %}
@@ -130,7 +183,7 @@
         target="_blank">
         <img class="attachment_icon" src="{{url_base}}/img/attachment.svg" />
         <div class="attachment_txt">
-            <div class="attachment_name">{{unquote(atta.file_name)}}</div>
+            <div class="attachment_name">{{unquote(atta.file_name)}} ({{atta.get_size_str()}})</div>
         </div>
     </a>
     {% endif %}
@@ -138,28 +191,38 @@
     <!-- attachments end -->
 
 
-    {% if post.external_link %}
-    <a class="link_preview card_embed" href="https://{{post.external_link.url}}" target="_blank">
-        {% if post.external_link.thumbnail %}
-        <img class="link_preview_thumbnail" onerror="this.style.display='none';"
-            src="{{url_base}}/cache_proxy/{{post.external_link.thumbnail}}">
-        {% endif %}
-        <div class="link_preview_title">
-            {{post.external_link.title or post.external_link.url}}
+    <!-- tags -->
+    {% if post.tags %}
+    <div class="card_body_tags card_embed" {% if not detailed_view
+        %}href='{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}#tags'
+        onclick="show_in_overlay(this)" {% endif %}>
+        <div class="card_body_tags_inner fade-text">
+            <img class="inline_icon" src="{{url_base}}/img/tag.svg" />
+            {% for tag in post.tags %}
+            <a class="tag" href="{{url_base}}/tl?q={{tag}}">{{unquote(tag)}}</a>
+            {% endfor %}
         </div>
-        <div class="link_preview_desc">
-            {{post.external_link.description}}
-        </div>
-        <div class="link_preview_url">
-            <img src="{{url_base}}/img/globe.svg">
-            {{post.external_link.clean_url}}
-        </div>
+    </div>
+    {% endif %}
+    <!-- tags end -->
+
+</div>
+
+
+<div class="links_container">
+    {% if post.type == 'patreon' and user.extra_data.get('party_url', '') %}
+    <a href="{{user.extra_data.get('party_url', '')}}/post/{{post.post_id.split('@')[0]}}" class="card_link"
+        target="_blank">
+        <img src="{{url_base}}/img/fox.svg" style="scale: 0.9;" />
+    </a>
+    {% endif %}
+    <a href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}" class="card_link"
+        onclick="show_in_overlay(this)">
+        <img src="{{url_base}}/img/eye.svg" />
+    </a>
+    {% if post.url %}
+    <a href="{{post.url}}" class="card_link" target="_blank">
+        <img src="{{url_base}}/img/open.svg" />
     </a>
     {% endif %}
 </div>
-<a href="{{post.url}}" class="card_link" target="_blank">
-    <img src="{{url_base}}/img/open.svg" />
-</a>
-<a href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}" class="view_post card_link">
-    <img src="{{url_base}}/img/eye.svg" />
-</a>

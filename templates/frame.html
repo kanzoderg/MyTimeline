@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="{{url_base}}/css/style.css" />
     <link rel="stylesheet" href="{{url_base}}/css/frame.css" />
     <link rel="stylesheet" href="{{url_base}}/css/landscape_frame.css" id="landscape_frame_style" disabled />
+    <link rel="stylesheet" href="{{url_base}}/css/light_mode.css" disabled />
     <style>
         .iframe_container_bg {
             position: absolute;
@@ -37,7 +38,7 @@
         <div class="iframe_container" id="window1">
             <div class="iframe_container_bg" id="iframe_container_bg1"></div>
             <iframe class="iframe_content" id="window1_if" src=""></iframe>
-            <div class="close_window_btn" onclick="close_window(1)">
+            <div class="close_window_btn tiny_btn" onclick="close_window(1)">
                 <img src="{{url_base}}/img/cross.svg" />
             </div>
             <div class="drag_decoration"></div>
@@ -45,7 +46,7 @@
         <div class="iframe_container" id="window2">
             <div class="iframe_container_bg" id="iframe_container_bg2"></div>
             <iframe class="iframe_content" id="window2_if" src=""></iframe>
-            <div class="close_window_btn" onclick="close_window(2)">
+            <div class="close_window_btn tiny_btn" onclick="close_window(2)">
                 <img src="{{url_base}}/img/cross.svg" />
             </div>
             <div class="drag_decoration"></div>
@@ -58,17 +59,17 @@
     <div class="drag_area"></div>
     <div id="navigation" class="nav translucent">
         <div class="nav_item_warp">
-            <a class="nav_item" href="{{url_base}}/userlist" onclick="go_userlist()"
+            <a class="nav_item nav_item_to_tl" href="{{url_base}}/userlist" onclick="go_userlist()"
                 draggable=true>
                 <img src="{{url_base}}/img/home.svg" />
                 <!-- <div class="nav_item_deco"></div> -->
             </a>
-            <a class="nav_item" href="{{url_base}}/tl" onclick="go_tl()">
+            <a class="nav_item nav_item_to_tl" href="{{url_base}}/tl" onclick="go_tl()">
                 <img src="{{url_base}}/img/timeline.svg" />
                 <!-- <div class="nav_item_deco"></div> -->
             </a>
 
-            <a class="nav_item" href="{{url_base}}/fav" onclick="show_content('{{url_base}}/fav',2)">
+            <a class="nav_item nav_item_to_tl" href="{{url_base}}/fav" onclick="show_content(this.href,2)">
                 <img src="{{url_base}}/img/bookmark_empty.svg" />
                 <!-- <div class="nav_item_deco"></div> -->
             </a>

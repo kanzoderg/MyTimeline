@@ -1,118 +1,206 @@
-<div id="media_viewer" class="media_viewer">
-    <style>
-        .media {
-            position: fixed;
-            display: none;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
+<!DOCTYPE html>
+<html>
 
-        .bck_btn {
-            user-select: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 10rem;
-            z-index: 2;
-            background-color: #000000bb;
-            color: #fff;
-            opacity: 0;
-        }
+<head>
+    <meta charset="UTF-8" />
+    <title>{{title}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/style.css" />
+    <link rel="stylesheet" id="landscape_style" href="{{url_base}}/css/landscape.css" disabled />
+    <link rel="stylesheet" href="{{url_base}}/css/light_mode.css" disabled />
+    <link rel="manifest" href="{{url_base}}/mt.webmanifest" crossorigin="use-credentials">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta http-equiv="Content-Security-Policy"
+        content="script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+</head>
 
-        .back_img {
-            opacity: 0.07;
-            height: 10rem;
-            width: 100%;
-            position: absolute;
-            left: 0;
-            top: 0;
-            transform: scale(1.5);
-        }
-
-        .bck_btn:hover {
-            opacity: 1;
-        }
-    </style>
-    <video controls loop autoplay src="" id="video" class="media"></video>
-    <img src="" id="image" class="media"></img>
-    <div class="bck_btn" id="bck" onclick="close_media_viewer()">
-        <img src="{{url_base}}/img/left.svg" class="back_img"></img>
+<body>
+    <script src="{{url_base}}/js/script_preload.js"></script>
+    <div class="viewer_container" id="viewer_container_video" style="display: none;">
+        <video class="viewer_media" id="viewer_media_video" loop autoplay>
+            <source src="" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
     </div>
-    <script src="{{url_base}}/js/panzoom.js"></script>
+
+    <div class="viewer_container" id="viewer_container_img" style="display: none;">
+        <img src="{{selected_img_file_name}}" class="viewer_media" id="viewer_media_img" style="margin: 0;"
+            onload="img_loaded(this)" />
+    </div>
+
+    <div id="overlay_ui" onclick="show_card_wth_timeout()" onpointerover="show_card_wth_timeout()">
+        <div id="alt_text">
+            <div id="alt_text_text"></div>
+            <a id="close_alt_btn" class="float_btn" onclick="hide_alt()">
+                <img src="{{url_base}}/img/cross.svg" style="transform: scale(0.8);">
+            </a>
+        </div>
+        <div class="card translucent" id="p{{post_id}}">
+            <div class="border_btns">
+                <div class="border_btn translucent" id="file_size">0 kb</div>
+                <div class="border_btn translucent" id="viewer_progress" style="display: none;">
+                    {{progress[0]}} / {{progress[1]}}
+                </div>
+                <div class="border_btn translucent" id="viewer_alt_btn" onclick="show_alt('viewer_alt_btn')" data=""
+                    style="display: none;">
+                    ALT
+                </div>
+            </div>
+            <div id="video_ui" style="display: none;">
+                <div class="video_controls">
+                    <div class="time_label" id="time_current">00:00</div>
+                    <input type="range" id="video_seek" value="0" step="0.1" />
+                    <div class="time_label" id="time_total">00:00</div>
+                </div>
+                <div id="pause_btn" onclick="toggle_video_play()">
+                    <img src="{{url_base}}/img/pause_w.svg" id="pause_btn_img" />
+                </div>
+                <a href="{{url_base}}/shorts?uid={{post.uid}}" class="float_btn translucent"
+                    style="top: 1rem; right: 4rem;">
+                    <img src="{{url_base}}/img/video.svg" style="transform: scale(0.7);" />
+                </a>
+            </div>
+            <div class="card_header">
+                <a href="{{url_base}}/user/{{post.type}}/{{post.user_name}}">
+                    <img class="card_header_img" src="{{url_base}}/avatar/{{post.type}}/{{post.user_name}}" />
+                </a>
+                <div class="header_txt">
+                    {% if post.type in ['x', 'bsky'] %}
+                    <div class="card_header_title">{{user.nick[:20]}}
+                        <span class="card_header_name">@{{user.user_name}}</span>
+                    </div>
+                    {% elif post.type == 'reddit' %}
+                    <div class="card_header_title">r/{{user.user_name}}
+                        <span class="card_header_name">u/{{post.real_user}}</span>
+                    </div>
+                    {% elif post.type == 'fa' %}
+                    <div class="card_header_title">{{user.nick[:20]}}
+                        <span class="card_header_name">~ {{user.user_name}}</span>
+                    </div>
+                    {% elif post.type == 'patreon' %}
+                    <div class="card_header_title">{{user.nick[:20]}}
+                        <span class="card_header_name">on {{user.extra_data.get("service", "(?)")}}</span>
+                    </div>
+                    {% else %}
+                    <div class="card_header_title">{{user.nick[:20]}}
+                        <span class="card_header_name">{{user.user_name}}</span>
+                    </div>
+                    {% endif %}
+                    <div class="card_header_date">{{post.get_time_str()}}</div>
+                </div>
+            </div>
+            <div class="card_body">
+                <div class="card_body_text" style="height: 4rem; overflow-y: auto;">
+                    {{post.text_content_rendered | safe}}
+                </div>
+            </div>
+            <div class="card_footer">
+                <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+                    <img src="{{url_base}}/img/comment.svg" />
+                    <span>{{post.comments}}</span>
+                </a>
+                <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+                    <img src="{{url_base}}/img/repost.svg" />
+                    <span>{{post.reposts}}</span>
+                </a>
+                <a class="card_footer_item" href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}">
+                    <img src="{{url_base}}/img/like.svg" />
+                    <span>{{post.likes}}</span>
+                </a>
+                <a class="card_footer_item" onclick="add_fav('{{post.post_id}}')">
+                    {% if post.fav %}
+                    <img src="{{url_base}}/img/bookmark.svg" class="p{{post.post_id}}_fav" />
+                    {% else %}
+                    <img src="{{url_base}}/img/bookmark_empty.svg" class="p{{post.post_id}}_fav" />
+                    {% endif %}
+                </a>
+            </div>
+            <div class="links_container" style="top: unset; bottom: 8rem;">
+                {% if post.type == 'patreon' and user.extra_data.get('party_url', '') %}
+                <a href="{{user.extra_data.get('party_url', '')}}/post/{{post.post_id.split('@')[0]}}" class="card_link"
+                    target="_blank">
+                    <img src="{{url_base}}/img/fox.svg" style="scale: 0.9;" />
+                </a>
+                {% endif %}
+                <a href="{{url_base}}/post/{{post.type}}/{{post.user_name}}/{{post.post_id}}" class="card_link">
+                    <img src="{{url_base}}/img/eye.svg" />
+                </a>
+                {% if post.url %}
+                <a href="{{post.url}}" class="card_link" target="_blank">
+                    <img src="{{url_base}}/img/open.svg" />
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        <a onclick="history.back()" class="float_btn translucent" style="top: 1rem; left: 1rem;">
+            <img src="{{url_base}}/img/cross.svg" style="transform: scale(0.8);" />
+        </a>
+        <a onclick="iframe_enter_fullscreen()" class="float_btn translucent" style="top: 1rem; right: 1rem;">
+            <img src="{{url_base}}/img/full.svg" style="transform: scale(0.5);" />
+        </a>
+        <a onclick="reset_media_transform()" id="reset_transform_btn" class="float_btn translucent"
+            style="top: 1rem; right: 4rem; display: none;">
+            <img src="{{url_base}}/img/reset.svg" style="transform: scale(0.4);" />
+        </a>
+
+        <a onclick="prev_media()" class="float_btn translucent" id="media_prev"
+            style=" top: calc(50% - 1rem); left: 1rem; display: none;">
+            <img src="{{url_base}}/img/left.svg" style="transform: scale(0.8);" />
+        </a>
+        <a onclick="next_media()" class="float_btn translucent" id="media_next"
+            style="top: calc(50% - 1rem); right: 1rem; display: none;">
+            <img src="{{url_base}}/img/right.svg" style="transform: scale(0.8);" />
+        </a>
+    </div>
+    <script src="{{url_base}}/js/noreferer.js"></script>
+    <script src="{{url_base}}/js/helper.js"></script>
     <script>
-        const media_viewer = document.getElementById('media_viewer');
-        const video = document.getElementById('video')
-        const image = document.getElementById('image')
-        const bck_btn = document.getElementById('bck')
-        bck_btn.addEventListener('contextmenu', event => event.preventDefault());
+        var url_base = "{{url_base}}";
+        var post_id = "{{post.post_id}}";
+        var type = "{{post.type}}";
+        var user_name = "{{post.user_name}}";
 
-        var zoom = null;
-        var selected = null;
+        var current_media_idx = {{ media_idx }};
+        var media_cnt = {{ media_cnt }};
 
-        function is_fullscreen() {
-            return document.fullscreenElement != null;
-        }
+        var overlay_ui = document.getElementById("overlay_ui");
+        var viewer_video = document.getElementById("viewer_media_video");
+        var viewer_img = document.getElementById("viewer_media_img");
+        var viewer_container_video = document.getElementById('viewer_container_video');
+        var viewer_container_img = document.getElementById('viewer_container_img');
+        var viewer_videoseek = document.getElementById('video_seek'); //input
+        var time_current = document.getElementById('time_current'); //current time MM:SS
+        var time_total = document.getElementById('time_total'); //total time, MM:SS
+        var viewer_alt_btn = document.getElementById('viewer_alt_btn'); //alt text button
+        viewer_progress = document.getElementById('viewer_progress'); //progress text
+        file_size_btn = document.getElementById('file_size'); //file size button
+        pause_btn_img = document.getElementById('pause_btn_img'); //img 
+        video_ui = document.getElementById('video_ui'); //video controls container
+        media_prev_btn = document.getElementById('media_prev'); //previous media button
+        media_next_btn = document.getElementById('media_next'); //next media button
 
-        function show_media_viewer(src, isvideo) {
-            loading_viewer = true;
-            if (isvideo) {
-                selected = video;
-            } else {
-                selected = image;
+        window.addEventListener('load', function () {
+            show_card_wth_timeout();
+            if (viewer_img.src != location.href.split("#")[0]) {
+                // alert(viewer_img.src);
+                viewer_container_img.style.display = "block";
+                replace_media(type, user_name, post_id, current_media_idx, skip_img_load = true);
             }
-            selected.src = src;
-            if(isvideo)
-            {
-                selected.poster = src.replace("file/","thumb/")
+            else {
+                replace_media(type, user_name, post_id, current_media_idx);
             }
-            selected.style.display = 'block';
-            media_viewer.style.display = 'block';
-            zoom = Panzoom(selected, {
-                animate: false, maxScale: 8, minScale: 0.05,
-                setTransform: (elem, { scale, x, y }) => {
-                    zoom.setStyle('transform', `scale(${scale}) translate(${x}px, ${y}px) rotate(0deg)`)
-                    zoom.setStyle('transition', 'none')
+            init_viewer_video_controls();
+            init_img_controls();
+            // hash change
+            window.addEventListener("hashchange", function () {
+                if (!location.hash) {
+                    alt_text.style.display = "none";
                 }
-            })
-            selected.addEventListener('wheel', zoom.zoomWithWheel)
-            media_viewer.requestFullscreen()
-            setTimeout(() => {
-                loading_viewer = false;
-            }, 600);
-        }
-
-        function close_media_viewer() {
-            video.src = ""
-            image.src = ""
-            video.style.display = 'none';
-            image.style.display = 'none';
-            media_viewer.style.display = 'none';
-            selected.removeEventListener('wheel', zoom.zoomWithWheel)
-            document.exitFullscreen()
-        }
-
-        var loading_viewer = false;
-
-        setInterval(() => {
-            if (loading_viewer) {
-                return;
-            }
-            if (!is_fullscreen()) {
-                if (selected && selected.src) {
-                    video.src = ""
-                    image.src = ""
-                    video.style.display = 'none';
-                    image.style.display = 'none';
-                    media_viewer.style.display = 'none';
-                    selected.removeEventListener('wheel', zoom.zoomWithWheel)
-                }
-            }
-        }, 200);
+            });
+        });
 
     </script>
-    <script src="{{url_base}}/js/noreferer.js"></script>
-</div>
+</body>
+
+</html>

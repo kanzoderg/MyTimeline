@@ -1,0 +1,71 @@
+{% if sort_type=="new" and sorted_posts_ids|length > 0 %}
+<div class="sep_line"></div>
+<div class="date_deco">
+    {{ post_groups[0][0].get_date_str() }}
+</div>
+{% endif %}
+
+<div class="media_container media_container_many">
+    {% set max_media = 23 %}
+    {% set media_cnt = namespace(value=0) %}
+    {% set post_cnt = namespace(value=0) %}
+
+    {% for post_group in post_groups %}
+    {% for post in post_group %}
+
+    {% set media_cnt_per_post = namespace(value=0) %}
+    {% for media in post.medias[:max_media] %}
+    {% set viewer_url=url_base
+    + "/viewer/" + post.type + "/" + post.user_name + "/" + post.post_id + "?idx=" +
+    media_cnt_per_post.value | string %} {% if media.isvideo or media.isimage or media.isaudio %}
+    <a class="media_wrapper" href='{{viewer_url}}' onclick="show_in_overlay(this)">
+        <img class="card_media"
+            src="{{url_base}}/thumb/{{media.type}}/{{media.user_name}}/thumb_{{quote(media.file_name)}}" loading="lazy"
+            onload="img_loaded(this)" />
+        {% if media.isvideo or media.isaudio %}
+        <div class="video_icon">
+            <img src="{{url_base}}/img/play_w.svg" />
+        </div>
+        <div class="thumb_deco">
+            {{media.duration_str}}
+        </div>
+        {% endif %}
+        {% if media.file_name.endswith('.gif') %}
+        <div class="gif_icon thumb_deco">
+            <img src="{{url_base}}/img/gif.svg" />
+        </div>
+        {% endif %}
+    </a>
+    {% elif media.isflash %}
+    <a class="media_wrapper" href='{{viewer_url}}'>
+        <img class="card_media" src="{{url_base}}/thumb/{{media.type}}/{{media.user_name}}/{{media.file_name}}"
+            loading="lazy" onload="img_loaded(this)" />
+        <div class="video_icon" style="background: none; scale: 2;">
+            <img src="{{url_base}}/img/flash.svg" onload="img_loaded(this)" />
+        </div>
+    </a>
+    {% endif %}
+
+    {% set media_cnt.value = media_cnt.value + 1 %}
+    {% set media_cnt_per_post.value = media_cnt_per_post.value + 1 %}
+
+    {% if media_cnt_per_post.value == max_media and (post.medias | length) - media_cnt_per_post.value > 0 %}
+    <a class="more_media media_wrapper" href="{{viewer_url}}">
+        <img class="card_media"
+            src="{{url_base}}/thumb/{{post.type}}/{{post.user_name}}/thumb_{{post.medias[media_cnt_per_post.value].file_name}}"
+            onload="img_loaded(this)" />
+        <div class="more_media_text">+ {{ (post.medias | length) - media_cnt_per_post.value }}</div>
+    </a>
+    {% endif %}
+
+
+    {% endfor %}
+    {% endfor %}
+
+    {% set post_cnt.value = post_cnt.value + 1 %}
+    {% endfor %}
+</div>
+
+<!-- <div class="end_of_media_info">
+    {{ media_cnt.value }} medias in this page.
+</div> -->

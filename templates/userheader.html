@@ -9,16 +9,25 @@
         </a>
         <div class="user_header_txt">
             {% if user.type in ['x', 'bsky'] %}
-            <div class="user_header_title">{{user.nick}}</div>
-            <div class="user_header_date">@<span style="user-select: all;">{{user.user_name}}</span></div>
+            <div class="user_header_title" onclick="write2clipboard('{{user.nick}}')">{{user.nick}}</div>
+            <div class="user_header_date" onclick="write2clipboard('{{user.user_name}}')">@<span>{{user.user_name}}</span>
+            </div>
             {% elif user.type == 'reddit' %}
-            <div class="user_header_title">r/{{user.user_name}}</div>
+            <div class="user_header_title" onclick="write2clipboard('{{user.nick}}')">r/<span>{{user.user_name}}</span>
+            </div>
             {% elif user.type == 'fa' %}
-            <div class="user_header_title">{{user.nick}}</div>
-            <div class="user_header_date">~ {{user.user_name}}</div>
+            <div class="user_header_title" onclick="write2clipboard('{{user.nick}}')">{{user.nick}}</div>
+            <div class="user_header_date" onclick="write2clipboard('{{user.user_name}}')">~ <span>{{user.user_name}}</span>
+            </div>
             {% elif user.type == 'patreon' %}
-            <div class="user_header_title">{{user.nick}}</div>
-            <div class="user_header_date">on patreon</div>
+            <div class="user_header_title" onclick="write2clipboard('{{user.nick}}')">{{user.nick}}</div>
+            <div class="user_header_date" onclick="write2clipboard('{{user.user_name}}')">on
+                <span>{{user.extra_data.get("service", "(?)")}}</span>
+            </div>
+            {% else %}
+            <div class="user_header_title" onclick="write2clipboard('{{user.nick}}')">{{user.nick}}</div>
+            <div class="user_header_date" onclick="write2clipboard('{{user.user_name}}')"><span>{{user.user_name}}</span>
+            </div>
             {% endif %}
         </div>
         <div style="margin: 0.5rem; font-size: 0.9rem; margin-left: 0.9rem;">{{posts_cnt}} <span
@@ -40,57 +49,99 @@
             </a>
             {% endif %}
         </div>
-        <a class="user_header_button" onclick="toggle_user_context_menu()" style="right: 3.5rem;">
-            <img src="{{url_base}}/img/3dots.svg" />
-        </a>
-        {% if user.type == 'x' %}
-        <a class="user_header_button" href="{{user.url}}" target="_blank">
-            <img src="{{url_base}}/img/x.svg" />
-        </a>
-        {% elif user.type == 'bsky' %}
-        <a class="user_header_button" href="{{user.url}}" target="_blank">
-            <img src="{{url_base}}/img/bsky.svg" />
-        </a>
-        {% elif user.type == 'reddit' %}
-        <a class="user_header_button" href="{{user.url}}" target="_blank">
-            <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);" />
-        </a>
-        {% elif user.type == 'fa' %}
-        <a class="user_header_button" href="https://www.furaffinity.net/user/{{user.user_name}}" target="_blank">
-            <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);" />
-        </a>
-        {% elif user.type == 'patreon' %}
-        <a class="user_header_button" href="{{user.url}}" target="_blank">
-            <img src="{{url_base}}/img/patreon.svg" style="transform: scale(1.2);" />
-        </a>
-        <a class="user_header_button" href="{{user.extra_data.get('party_url', '')}}" target="_blank" style="top: 3rem">
-            <img src="{{url_base}}/img/fox.svg" style="transform: scale(1);" />
-        </a>
-        {% endif %}
-        <div class="user_header_update_time">
-            Updated: {{user.get_update_time_str()}}
-        </div>
 
-        {% if user.flagged %}
-        <div class="flagged" style="top: 0.85rem; right: 14.9rem; bottom: auto; left: auto; transform: scale(0.8);">
-            <img src="{{url_base}}/img/flagged.svg" />
+        <div class="user_header_buttons">
+            {% if user.flagged %}
+            <div class="flagged">
+                <img src="{{url_base}}/img/flagged.svg" />
+            </div>
+            {% endif %}
+            <div class="user_header_update_time">
+                Updated: {{user.get_update_time_str()}}
+            </div>
+            <a class="user_header_button" onclick="toggle_user_context_menu()" style="right: 3.5rem;">
+                <img src="{{url_base}}/img/3dots.svg" />
+            </a>
+            {% if user.type == 'x' %}
+            <a class="user_header_button" href="{{user.url}}" target="_blank">
+                <img src="{{url_base}}/img/x.svg" />
+            </a>
+            {% elif user.type == 'bsky' %}
+            <a class="user_header_button" href="{{user.url}}" target="_blank">
+                <img src="{{url_base}}/img/bsky.svg" />
+            </a>
+            {% elif user.type == 'reddit' %}
+            <a class="user_header_button" href="{{user.url}}" target="_blank">
+                <img src="{{url_base}}/img/reddit.svg" style="transform: scale(1.8);" />
+            </a>
+            {% elif user.type == 'fa' %}
+            <a class="user_header_button" href="{{user.url}}" target="_blank">
+                <img src="{{url_base}}/img/fa.svg" style="transform: scale(1);" />
+            </a>
+            {% elif user.type == 'patreon' %}
+            <a class="user_header_button" href="{{user.extra_data.get('party_url', '')}}" target="_blank">
+                <img src="{{url_base}}/img/fox.svg" style="transform: scale(1);" />
+            </a>
+            <a class="user_header_button" href="{{user.url}}" target="_blank">
+                <img src="{{url_base}}/img/patreon.svg" style="transform: scale(1.2);" />
+            </a>
+            {% elif user.type == 'e621' %}
+            <a class="user_header_button" href="{{user.url}}" target="_blank">
+                <img src="{{url_base}}/img/e621.svg" style="transform: scale(1.2);" />
+            </a>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
     <div id="user_context_menu_warpper" style="display: none;">
         <div id="user_context_menu" class="context_menu">
+            {% if user.type in ['x', 'bsky', 'e621', 'fa', 'reddit'] %}
             <a class="context_item" onclick="add_job('{{user.url}}', false, false)">
-                <img src="{{url_base}}/img/reload.svg" class="inline_icon" /> Update</a>
+                <img src="{{url_base}}/img/reload.svg" class="inline_icon" />
+                Update
+            </a>
+            {% endif %}
+            {% if user.type in ['x', 'bsky'] %}
             <a class="context_item" onclick="add_job('{{user.url}}', false, true)">
-                <img src="{{url_base}}/img/reload.svg" class="inline_icon" /> Update (media only)</a>
-            <a class="context_item" onclick="flag_user('{{user.uid}}')"><img src="{{url_base}}/img/flag.svg"
-                    class="inline_icon" /> Flag User</a>
-            <a class="context_item" onclick="unflag_user('{{user.uid}}')"><img src="{{url_base}}/img/unflag.svg"
-                    class="inline_icon" /> Unflag User</a>
-            <a class="context_item" onclick="add_rescan('{{user.uid}}')"><img src="{{url_base}}/img/scan.svg"
-                    class="inline_icon" /> Scan</a>
+                <img src="{{url_base}}/img/reload.svg" class="inline_icon" />
+                Update (media only)
+            </a>
+            {% endif %}
+
+            <a class="context_item" onclick="flag_user('{{user.uid}}')">
+                <img src="{{url_base}}/img/flag.svg" class="inline_icon" />
+                Flag User
+            </a>
+            <a class="context_item" onclick="unflag_user('{{user.uid}}')">
+                <img src="{{url_base}}/img/unflag.svg" class="inline_icon" />
+                Unflag User
+            </a>
+            <a class="context_item" onclick="show_rename_dialog()">
+                <img src="{{url_base}}/img/rename.svg" class="inline_icon" />
+                Rename
+            </a>
+            <a class="context_item" onclick="add_rebuild('{{user.uid}}')">
+                <img src="{{url_base}}/img/build.svg" class="inline_icon" />
+                Rebuild
+            </a>
+            <a class="context_item" onclick="add_rescan('{{user.uid}}')">
+                <img src="{{url_base}}/img/scan.svg" class="inline_icon" />
+                Scan
+            </a>
         </div>
         <div id="user_context_menu_background" class="context_menu_background" onclick="toggle_user_context_menu()">
+        </div>
+    </div>
+    <div class="rename_dialog" id="rename_dialog">
+        <div class="full_menu_background" onclick="hide_rename_dialog()">
+        </div>
+        <div class="renameDialogContent">
+            <h2>Rename User</h2><br />
+            From: <span id="old_username">{{user.uid}}</span><br /><br />
+            To:<br />
+            <input type="text" id="new_username" placeholder="Enter new username" />@{{user.type}}
+            <br /><br />
+            <button onclick="confirm_rename()">Confirm</button>
+            <button onclick="hide_rename_dialog()">Cancel</button>
         </div>
     </div>
 </div>

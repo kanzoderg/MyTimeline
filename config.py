@@ -21,6 +21,7 @@ log_file = None
 user_pin_hased = None
 admin_pin_hased = None
 allow_external_url_preview = False
+custom_user_json = "custom_users.json"
 
 config_read = False
 
@@ -36,7 +37,7 @@ kemono_proxy = "kemono.cr"
 coomer_proxy = "coomer.st"
 
 def read_config(filename="config.json"):
-    global host, port, url_base, cookies_list, auth_files, fs_bases, cache_path, thumbnail_size, custom_gallery_dl_location, items_per_page, proxy, no_auth, user_pin, admin_pin, super_session_key, log_file, user_pin_hased, admin_pin_hased, config_read, current_python, allow_external_url_preview
+    global host, port, url_base, cookies_list, auth_files, fs_bases, cache_path, thumbnail_size, custom_gallery_dl_location, items_per_page, proxy, no_auth, user_pin, admin_pin, super_session_key, log_file, user_pin_hased, admin_pin_hased, config_read, current_python, allow_external_url_preview, custom_user_json
     if os.path.exists(filename):
         with open(filename, "r") as f:
             _config_data = json.load(f)
@@ -78,6 +79,9 @@ def read_config(filename="config.json"):
     fs_bases["fa"] = os.path.expanduser(fs_bases.get("fa", "./downloads/furaffinity"))
     fs_bases["patreon"] = os.path.expanduser(
         fs_bases.get("patreon", "./downloads/patreon")
+    )
+    fs_bases["e621"] = os.path.expanduser(
+        fs_bases.get("e621", "./downloads/e621")
     )
     cache_path = os.path.expanduser(cache_path)
 
@@ -125,4 +129,5 @@ def read_config(filename="config.json"):
 
     log_file = _config_data.get("log_file", "./log.txt")
     allow_external_url_preview = bool(_config_data.get("allow_external_url_preview", False))
+    custom_user_json = _config_data.get("custom_user_json", "custom_users.json")
     config_read = True

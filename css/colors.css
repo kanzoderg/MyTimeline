@@ -1,16 +1,20 @@
 body {
     --text-color: #ffffff;
-    --text-color-alt: #ffffffaa;
-    --accent-color: rgb(255, 0, 111);
+    --text-color-alt: #ffffffbb;
+    --accent-color: #FF5722;
     --accent-color-dark: rgb(126, 0, 57);
     --accent-color-light: rgb(43, 188, 255);
-    --internal-link-color: rgb(68, 174, 255);
-    --external-link-color: rgb(255, 150, 70);
+    --internal-link-color: #03A9F4;
+    --external-link-color: #B2DFDB;
     --bg-color: #000000;
-    --bg-with-alpha: rgba(0, 0, 0, 0.3);
-    --bg-with-alpha-hover-dark: rgba(0, 0, 0, 0.5);
+    --bg-with-alpha: rgba(0, 0, 0, 0.7);
+    --bg-with-alpha-hover-dark: rgba(0, 0, 0, 0.9);
     --bg-with-alpha-hover-light: rgba(255, 255, 255, 0.06);
+    --bg-color-alt: #222;
+    --bg-color-alt-hover: #333;
     --bg-light: rgba(255, 255, 255, 0.2);
     --border-color: #fff3;
-    --border-color-dark: #0003;
+    --border-color-hover: #fff5;
+    --border-color-alt: #fff3;
+    --border-color-alt-hover: #fff3;
 }

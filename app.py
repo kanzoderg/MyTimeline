@@ -75,7 +75,7 @@ if "gunicorn" in sys.argv[0]:
 print("Starting MT with options:", args)
 config.read_config(args.config)
 
-import backend, utils, logger, run_command, live_timeline_monitor
+import backend, utils, logger, run_command, live_timeline_monitor, database
 
 logger.VERBOSE_LEVEL = args.verbose
 backend.debug_mode = args.debug
@@ -175,7 +175,7 @@ def get_posts(
 
     if method == "tl":
         if query:
-            sorted_posts_ids, all_post_count = backend.db.query_post_by_text(
+            sorted_posts_ids, all_post_count = database.db.query_post_by_text(
                 query,
                 page * config.items_per_page,
                 config.items_per_page,
@@ -183,17 +183,17 @@ def get_posts(
             )
             sorted_posts_ids = sorted_posts_ids[::-1]
         else:
-            all_post_count = backend.db.get_post_count()
+            all_post_count = database.db.get_post_count()
             if sort_type == "new":
-                sorted_posts_ids, _ = backend.db.get_new(
+                sorted_posts_ids, _ = database.db.get_new(
                     page * config.items_per_page, config.items_per_page
                 )
             elif sort_type == "top":
-                sorted_posts_ids, _ = backend.db.get_top(
+                sorted_posts_ids, _ = database.db.get_top(
                     page * config.items_per_page, config.items_per_page
                 )
             elif sort_type == "random":
-                sorted_posts_ids = backend.db.get_random(config.items_per_page)
+                sorted_posts_ids = database.db.get_random(config.items_per_page)
             else:
                 return [], 0
             sorted_posts_ids = sorted_posts_ids[::-1]
@@ -212,22 +212,22 @@ def get_posts(
             return [], 0
         uid = f"{user_name}@{type_}"
         if sort_type == "new":
-            sorted_posts_ids, all_post_count = backend.db.get_new(
+            sorted_posts_ids, all_post_count = database.db.get_new(
                 page * config.items_per_page,
                 config.items_per_page,
                 uid=uid,
                 media_only=media_only,
             )
         elif sort_type == "top":
-            sorted_posts_ids, all_post_count = backend.db.get_top(
+            sorted_posts_ids, all_post_count = database.db.get_top(
                 page * config.items_per_page,
                 config.items_per_page,
                 uid=uid,
                 media_only=media_only,
             )
         elif sort_type == "random":
-            all_post_count = backend.db.get_post_count()
-            sorted_posts_ids = backend.db.get_random(config.items_per_page)
+            all_post_count = database.db.get_post_count()
+            sorted_posts_ids = database.db.get_random(config.items_per_page)
         else:
             return [], 0
         sorted_posts_ids = sorted_posts_ids[::-1]
@@ -236,127 +236,156 @@ def get_posts(
     return [], 0
 
 
-def get_posts_n_users_by_ids(post_ids, load_reply=True, load_comments=False):
+@utils.time_it
+def get_post_groups_by_ids(
+    post_ids, load_reply=True, load_comments=False, sort_groups=False
+):
+
     posts = {}
     users = {}
+    post_groups = {}
 
-    external_posts = {} # save some db queries
+    cursor = 0
+    post_ids_queue = [(pid, "", "", 0, 0) for pid in post_ids]
+    seen = set()
 
-    reply_relationships = {}  # post_id -> reply_to_id, for loop detection and sorting
-    cnt = 0
-    bump_actions = 0
-    max_bump_actions = config.items_per_page * 30
-    stop_load_reply = False
-    max_posts_to_load = config.items_per_page * 30
-
-    sorted_posts_ids = post_ids.copy()
-    while cnt < len(sorted_posts_ids):
-        if len(sorted_posts_ids) > max_posts_to_load and not stop_load_reply:
+    while cursor < len(post_ids_queue):
+        if len(post_ids_queue) > 1000:
             logger.log(
-                f"Warning: Too many posts to load: {len(sorted_posts_ids)}, there might be a loop in replies. Stopping further reply loading.",
+                f"Warning: post_ids_queue length is {len(post_ids_queue)}, which may indicate a problem with loading posts.",
                 type="warning",
             )
-            stop_load_reply = True
+        if len(post_ids_queue) > 10000:
+            logger.log(
+                f"Error: post_ids_queue length is {len(post_ids_queue)}, which indicates a serious problem with loading posts. Breaking the loop.",
+                type="error",
+            )
+            break
 
-        post_id = sorted_posts_ids[cnt]
-        cnt += 1
+        post_id, group_id, username, _time, _piority = post_ids_queue[cursor]
+        cursor += 1
 
-        if post_id in posts:
-            # This post is already loaded, if it's a reply, bump its reply_to to the front
-            if post_id in reply_relationships:
-                reply_post_id = reply_relationships[post_id]
-                logger.log(
-                    f"post {post_id} is already loaded, bumped its reply_to {reply_post_id} to the front",
-                    verbose=3,
-                )
-                if (
-                    reply_post_id in sorted_posts_ids
-                    and bump_actions < max_bump_actions
-                ):
-                    sorted_posts_ids.remove(reply_post_id)
-                    cnt -= 1
-                    sorted_posts_ids.insert(cnt, reply_post_id)
-                    bump_actions += 1
+        if post_id in seen:
             continue
+        seen.add(post_id)
 
-        post = backend.Post(post_id, None, None)
-        # Load post info
-        if not post.load_from_db():
-            post.isplaceholder = True
-            post.type, post.user_name = external_posts.get(post_id, ("", ""))
-            post.concat_url()
-            logger.log(f"guessed url for external post: {post.url}", verbose=3)
-        else:
+        post = backend.Post(post_id, username, post_id.split("@")[1])
+        post.piority = _piority
+        if post.load_from_db():
             post.init_medias()
-            post.init_embed()
+            post.init_embeds()
 
-        # Load user info
-        if post.user_name not in users:
+        posts[post_id] = post
+        if not post.user_name in users:
             user = backend.User(post.user_name, post.type)
             user.load_from_db()
             users[post.user_name] = user
+        post.user = users[post.user_name]
 
-        posts[post_id] = post
+        if post.reply_root_id:
+            group_id = post.reply_root_id
+        elif post.reply_to_id:
+            group_id = post.reply_to_id
+        elif not group_id:
+            group_id = post_id
 
-        # push its reply_to to the list if it has one
-        if post.isreply and post.reply_to and load_reply and (not stop_load_reply):
-            logger.log(f"post {post.post_id} is a reply to {post.reply_to}", verbose=3)
-            reply_post_id, reply_user_name = post.reply_to.split("@")
-            reply_post_id = reply_post_id + "@" + post.type  # ensure type suffix
-            external_posts[reply_post_id] = (post.type, reply_user_name)
-            reply_relationships[post_id] = reply_post_id
-            if reply_post_id in sorted_posts_ids and bump_actions < max_bump_actions:
-                logger.log(
-                    f"post {post_id} bumped its reply_to {reply_post_id} to the front",
-                    verbose=3,
-                )
-                sorted_posts_ids.remove(reply_post_id)
-                cnt -= 1
-                sorted_posts_ids.insert(cnt, reply_post_id)
-                bump_actions += 1
-            else:
-                sorted_posts_ids.insert(cnt, reply_post_id)
+        if not post.reply_to_id and group_id != post_id:
+            post.reply_to_id = group_id
 
-        # push its comments to the list if it has any
-        if load_comments:
-            logger.log(f"Loading comments for post {post_id}...", verbose=3)
-            reply_to_id = f"{post_id.split('@')[0]}@{users[post.user_name].udid}"
-            comments_rows = db.raw_query(
-                ("SELECT post_id, uid FROM posts WHERE reply_to = ?", (reply_to_id,))
+        if not post_id in post_groups.get(group_id, {}):
+            post_groups.setdefault(group_id, {})[post_id] = post
+
+        if post.isplaceholder:
+            logger.log(
+                f"Post {post_id} is a placeholder, skipping loading replies and comments.",
+                type="warning",
+                verbose=2,
             )
-            for comment_post_id, comment_uid in comments_rows:
-                if not "@" in comment_post_id:
-                    comment_post_id = (
-                        comment_post_id + "@" + post.type
-                    )  # ensure type suffix
-                comment_user_name = comment_uid.split("@")[0]
-                external_posts[comment_post_id] = (post.type, comment_user_name)
-                if not comment_post_id in sorted_posts_ids:
-                    sorted_posts_ids.append(comment_post_id)
+            logger.log(post_id, group_id, username, _time, type="warning")
+            continue
+
+        if load_reply:
+            # Add reply_to and reply_root posts to group
+            if post.reply_to_id and not post.reply_to_id in post_groups.get(
+                group_id, {}
+            ):
+                try:
+                    reply_to_username = post.reply_to.split("@")[1]
+                except:
                     logger.log(
-                        f"Added comment post {comment_post_id} to load list.", verbose=3
+                        f"Error parsing reply_to username for post {post_id} with reply_to {post.reply_to}",
+                        type="error",
+                    )
+                    reply_to_username = ""
+                post_ids_queue.insert(
+                    cursor,
+                    (
+                        post.reply_to_id,
+                        group_id,
+                        reply_to_username,
+                        post.time,
+                        post.time - 1,
+                    ),
+                )
+
+            if post.reply_root_id and not post.reply_root_id in post_groups.get(
+                group_id, {}
+            ):
+                try:
+                    reply_root_username = post.reply_root.split("@")[1]
+                except:
+                    logger.log(
+                        f"Error parsing reply_root username for post {post_id} with reply_root {post.reply_root}",
+                        type="error",
+                    )
+                    reply_root_username = ""
+                post_ids_queue.insert(
+                    cursor,
+                    (
+                        post.reply_root_id,
+                        group_id,
+                        reply_root_username,
+                        post.time,
+                        1,
+                    ),
+                )
+            elif post.reply_root_id in post_groups.get(group_id, {}):
+                post_groups[group_id][post.reply_root_id].piority = 1
+
+        if load_comments:
+            # Add comments to group
+            comments_post_ids = database.db.get_comments(
+                f"{group_id.split('@')[0]}@{user.udid}", type=post.type
+            )
+            for comment_post_id, username in comments_post_ids:
+                if not comment_post_id in post_groups.get(group_id, {}):
+                    post_ids_queue.append(
+                        (
+                            comment_post_id,
+                            group_id,
+                            username,
+                            post.time,
+                            0,
+                        )
                     )
 
-        if bump_actions >= max_bump_actions:
-            logger.log(
-                f"Reached max bump actions ({max_bump_actions}), stop bumping posts to the front, potential loop in replies.",
-                type="warning",
-            )
+    post_groups_list = []
+    for group_id, group_posts in post_groups.items():
+        group = []
+        for post_id, post in group_posts.items():
+            group.append(post)
+        group.sort(key=lambda x: (x.piority or x.time, x.post_id), reverse=False)
+        # group = group[::-1]
+        post_groups_list.append(group)
+    if sort_groups:
+        post_groups_list.sort(key=lambda x: x[-1].time, reverse=True)
+    else:
+        post_groups_list = post_groups_list[::-1]
 
-    sorted_posts_ids = sorted_posts_ids[::-1]
-
-    # Remove duplicates while preserving order
-    # seen = set()
-    # unique_sorted_posts_ids = []
-    # for post_id in sorted_posts_ids:
-    #     if post_id not in seen:
-    #         seen.add(post_id)
-    #         unique_sorted_posts_ids.append(post_id)
-    # sorted_posts_ids = unique_sorted_posts_ids
-    return posts, users, sorted_posts_ids
+    return post_groups_list
 
 
-def get_timeline_fragment(
+def get_timeline_content(
     method="tl",
     type_="",
     sorted_posts_ids=[],
@@ -366,8 +395,22 @@ def get_timeline_fragment(
     user_name="",
     p=0,
     tab="posts",
+    frag_only=False,
 ):
-    posts, users, sorted_posts_ids = get_posts_n_users_by_ids(sorted_posts_ids)
+    post_groups = get_post_groups_by_ids(
+        sorted_posts_ids,
+        load_reply=tab == "posts",
+        load_comments=False,
+        sort_groups=False,
+    )
+    if tab == "media" and frag_only:
+        # count media
+        media_cnt = 0
+        for group in post_groups:
+            for post in group:
+                media_cnt += len(post.medias)
+        if media_cnt == 0:
+            return ""
 
     # Determine page URL and rendering options
     if method == "tl":
@@ -375,24 +418,29 @@ def get_timeline_fragment(
     elif method == "fav":
         page_url = f"{config.url_base}/fav"
     else:  # user
-        if user_name in users:
-            user_obj = users[user_name]
-        else:
-            user_obj = backend.User(user_name, type_)
-            user_obj.load_from_db()
-            users[user_name] = user_obj
+        user_obj = backend.User(user_name, type_)
+        user_obj.load_from_db()
         page_url = f"{config.url_base}/user/{type_}/{user_name}"
+
+    if frag_only:
+        if tab == "media":
+            template_to_render = "mediagrid_frag.html"
+        else:
+            template_to_render = "timeline_frag.html"
+    else:
+        template_to_render = "timeline.html"
 
     # Render timeline
     timeline_content = render_template(
-        "timeline.html",
+        template_to_render,
+        tab=tab,
         section=method,
-        posts=posts,
+        anchor_user=user_obj if method == "user" else None,
+        post_groups=post_groups,
         sorted_posts_ids=sorted_posts_ids,
         items_per_page=config.items_per_page,
         user_name=user_name if method == "user" else "",
         type=type_ if method == "user" else ("tl" if method == "tl" else ""),
-        users=users,
         url_base=config.url_base,
         page_url=page_url,
         sort_type=sort_type,
@@ -402,79 +450,8 @@ def get_timeline_fragment(
         unquote=unquote,
     )
 
-    # Build content with optional headers
-    if method == "tl":
-        search_bar = render_template("searchbar.html", url_base=config.url_base)
-        content = search_bar + timeline_content
-    elif method == "fav":
-        content = timeline_content
-    else:  # user
-        userheader = render_template(
-            "userheader.html",
-            type=type_,
-            user=user_obj,
-            url_base=config.url_base,
-            posts_cnt=all_post_count,
-            tab=tab,
-        )
-        content = userheader + timeline_content
-    return content
-
-
-def get_mediagrid_fragment(
-    method="tl",
-    type_="",
-    sorted_posts_ids=[],
-    all_post_count=0,
-    sort_type="new",
-    q="",
-    user_name="",
-    p=0,
-    tab="media",
-):
-    posts = {}
-    users = {}
-    external_posts = {}
-
-    cnt = 0
-    for post_id in sorted_posts_ids:
-        post = backend.Post(post_id, None, None)
-        post.load_from_db()
-        post.init_medias()
-        posts[post_id] = post
-
-    # Determine page URL and rendering options
-    if method == "tl":
-        page_url = f"{config.url_base}/tl"
-    elif method == "fav":
-        page_url = f"{config.url_base}/fav"
-    else:  # user
-        if user_name in users:
-            user_obj = users[user_name]
-        else:
-            user_obj = backend.User(user_name, type_)
-            user_obj.load_from_db()
-            users[user_name] = user_obj
-        page_url = f"{config.url_base}/user/{type_}/{user_name}"
-
-    # Render timeline
-    timeline_content = render_template(
-        "mediagrid.html",
-        section=method,
-        posts=posts,
-        sorted_posts_ids=sorted_posts_ids[::-1],
-        items_per_page=config.items_per_page,
-        user_name=user_name if method == "user" else "",
-        type=type_ if method == "user" else ("tl" if method == "tl" else ""),
-        users=users,
-        url_base=config.url_base,
-        page_url=page_url,
-        sort_type=sort_type,
-        q=q,
-        p=p + 1,
-        quote=quote,
-        unquote=unquote,
-    )
+    if frag_only:
+        return timeline_content
 
     # Build content with optional headers
     if method == "tl":
@@ -514,6 +491,7 @@ def _timeline(method="tl", type_="", user_name=""):
     tab = request.args.get("tab", "posts")
     query = request.args.get("q", "").strip()
     sort_type = request.args.get("sort_type", "new").strip()
+    frag_only = request.args.get("frag_only", "0") == "1"
 
     if method == "tl":
         sorted_posts_ids, all_post_count = get_posts(
@@ -565,31 +543,23 @@ def _timeline(method="tl", type_="", user_name=""):
 
     max_page = ceil(all_post_count / config.items_per_page)
 
-    # Handle media tab for fav and user methods
-    if tab == "media":
-        content_frag = get_mediagrid_fragment(
-            method=method,
-            type_=type_,
-            sorted_posts_ids=sorted_posts_ids,
-            all_post_count=all_post_count,
-            sort_type=sort_type,
-            q=query,
-            user_name=user_name,
-            p=page,
-            tab=tab,
-        )
-    else:
-        content_frag = get_timeline_fragment(
-            method=method,
-            type_=type_,
-            sorted_posts_ids=sorted_posts_ids,
-            all_post_count=all_post_count,
-            sort_type=sort_type,
-            q=query,
-            user_name=user_name,
-            p=page,
-            tab=tab,
-        )
+    content_frag = get_timeline_content(
+        method=method,
+        type_=type_,
+        sorted_posts_ids=sorted_posts_ids,
+        all_post_count=all_post_count,
+        sort_type=sort_type,
+        q=query,
+        user_name=user_name,
+        p=page,
+        tab=tab,
+        frag_only=frag_only,
+    )
+
+    if frag_only:
+        if tab == "media" and content_frag.strip() == "":
+            return {"status": "continue", "content": ""}
+        return {"status": "success", "content": content_frag}
 
     # Build nav template kwargs
     nav_kwargs = {
@@ -604,6 +574,7 @@ def _timeline(method="tl", type_="", user_name=""):
         "shorts_decoration": "",
         "shorts_icon": "",
         "shorts_q": "",
+        "tab": tab,
     }
 
     if method == "tl":
@@ -698,8 +669,10 @@ def build_app():
         force_redownload = request.args.get("redownload", "0") == "1"
         if not type or type == "None":
             return send_file("img/default_avatar.png", mimetype="image/jpeg")
-        fn = f"{config.fs_bases[type]}/{name}/avatar"
-        fn_bck = f"{config.fs_bases[type]}/{name}/avatar_bck"
+        if type == "e621":
+            return send_file("img/e621_color.svg", mimetype="image/svg+xml")
+        fn = f"{config.fs_bases.get(type, '')}/{name}/avatar"
+        fn_bck = f"{config.fs_bases.get(type, '')}/{name}/avatar_bck"
         if not os.path.exists(fn) or force_redownload:
             user = backend.User(name, type)
             user.load_from_db()
@@ -769,8 +742,8 @@ def build_app():
         force_redownload = request.args.get("redownload", "0") == "1"
         if not type or type == "None":
             return send_file("img/default_avatar.png", mimetype="image/jpeg")
-        fn = f"{config.fs_bases[type]}/{name}/banner"
-        fn_bck = f"{config.fs_bases[type]}/{name}/banner_bck"
+        fn = f"{config.fs_bases.get(type, '')}/{name}/banner"
+        fn_bck = f"{config.fs_bases.get(type, '')}/{name}/banner_bck"
         if not os.path.exists(fn) or force_redownload:
             user = backend.User(name, type)
             user.load_from_db()
@@ -833,7 +806,7 @@ def build_app():
 
         query = request.args.get("q", "").strip()
         tab = request.args.get("tab", "all")
-        seach_bar = render_template("searchbar.html", url_base=config.url_base)
+        search_bar = render_template("searchbar.html", url_base=config.url_base)
         if tab == "all":
             if query:
                 fuzz_query = (
@@ -876,20 +849,21 @@ def build_app():
             all_groups = backend.get_user_groups()
             max_page = ceil(len(all_groups) / config.items_per_page)
             if query:
-                all_groups = [g for g in all_groups if query.lower() in g.lower()]
+                all_groups = [g for g in all_groups if query.lower() in g[0].lower()]
             groups = all_groups[
                 page * config.items_per_page : (page + 1) * config.items_per_page
             ]
             users_in_groups = {}
             for group in groups:
-                user_ids = backend.get_uids_in_group(group)
-                logger.log(f"Group '{group}' has users: {user_ids}", verbose=2)
+                group_name, group_id = group
+                user_ids = backend.get_uids_in_group(group_id)
+                logger.log(f"Group '{group_name}' has users: {user_ids}", verbose=2)
                 users = []
                 for user_id in user_ids:
                     user = backend.User(user_id.split("@")[0], user_id.split("@")[1])
                     user.load_from_db()
                     users.append(user)
-                users_in_groups[group] = users
+                users_in_groups[group_name] = users
             userlist = render_template(
                 "userlist.html",
                 groups=groups,
@@ -907,7 +881,7 @@ def build_app():
                 "/", config.url_base, f"userlist?sort_type={sort_type}"
             ),
             max_page=max_page,
-            content=seach_bar + userlist,
+            content=search_bar + userlist,
             section="userlist",
             url_base=config.url_base,
             shorts_decoration="",
@@ -943,7 +917,7 @@ def build_app():
     @check_auth()
     def _add_fav():
         post_id = request.args["post_id"]
-        if backend.db.query_rows(
+        if database.db.query_rows(
             selected_table="fav", key="post_id", value=post_id, ignore_cache=True
         ):
             logger.log("remove favorite", post_id)
@@ -959,104 +933,115 @@ def build_app():
             }
 
     @app.route(
-        posixpath.join(
-            "/", config.url_base, "fullscreen_card", "<type>", "<name>", "<pid>"
-        )
+        posixpath.join("/", config.url_base, "viewer", "<type>", "<name>", "<pid>")
     )
     @check_auth()
-    def _fullscreen_card(type, name, pid):
-        # if type == "patreon":
-        #     print("Accessing Patreon media:", filename)
-        #     filename = unescape(filename)
-        #     print("Decoded filename:", filename)
+    def _viewer(type, name, pid):
         media_index = int(request.args.get("idx", 0))
         user = backend.User(name, type)
         user.load_from_db()
         post = backend.Post(pid, name, type)
         post.load_from_db()
+        post.user = user
 
-        media_ids = backend.db.query_rows(
+        _media = database.db.query_rows(
             selected_table="media",
             key="post_id",
             value=pid,
             sort_key=utils.sort_keys["e0"],
             reverse=False,
         )
-        media_ids = [m[0] for m in media_ids if m[5] in (utils.VIDEO, utils.IMAGE)]
+        media_ids = [m[0] for m in _media if m[5] in (utils.VIDEO, utils.IMAGE)]
+        total_media = len(media_ids)
         if len(media_ids) == 0:
             return "No media found for this post.", 404
-        media_id = (
-            media_ids[media_index]
-            if media_index and 0 <= media_index < len(media_ids)
-            else media_ids[0]
-        )
-        media = backend.Media(media_id, None, name, type)
-        media.load_from_db()
-        logger.log("media_ids for post", media.post_id, ":", media_ids, verbose=2)
-        if media_index > 0:
-            prev_url = posixpath.join(
-                config.url_base or "/",
-                "fullscreen_card",
-                type,
-                name,
-                f"{pid}?idx={media_index-1}",
-            )
-        else:
-            prev_url = ""
-        if media_index < len(media_ids) - 1 and media_index != -1:
-            next_url = posixpath.join(
-                config.url_base or "/",
-                "fullscreen_card",
-                type,
-                name,
-                f"{pid}?idx={media_index+1}",
-            )
-        else:
-            next_url = ""
 
-        card = render_template(
-            "fullscreen_card.html",
-            media=media,
+        print(_media[media_index])
+        if media_index < len(_media) and _media[media_index][5] == utils.IMAGE:
+            selected_img_file_name = _media[media_index][2]
+            selected_img_file_name = posixpath.join(
+                "/", config.url_base, "file", type, name, selected_img_file_name
+            )
+        else:
+            selected_img_file_name = ""
+
+        viewer = render_template(
+            "viewer.html",
             user=user,
             post=post,
             url_base=config.url_base,
-            prev_url=prev_url,
-            next_url=next_url,
-            alt_text=(
+            media_cnt=total_media,
+            media_idx=media_index,
+            selected_img_file_name=selected_img_file_name,
+            quote=quote,
+            unquote=unquote,
+            progress=(media_index + 1, total_media),
+        )
+        return viewer
+
+    @app.route(
+        posixpath.join("/", config.url_base, "api/media", "<type>", "<name>", "<pid>")
+    )
+    @check_auth()
+    def _api_media(type, name, pid):
+        media_index = int(request.args.get("idx", 0))
+        user = backend.User(name, type)
+        user.load_from_db()
+        post = backend.Post(pid, name, type)
+        post.load_from_db()
+        post.user = user
+
+        media_ids = database.db.query_rows(
+            selected_table="media",
+            key="post_id",
+            value=pid,
+            sort_key=utils.sort_keys["e0"],
+            reverse=False,
+        )
+        media_ids = [
+            m[0] for m in media_ids if m[5] in (utils.VIDEO, utils.AUDIO, utils.IMAGE)
+        ]
+        print("media_ids:", media_ids)
+
+        if len(media_ids) < media_index + 1:
+            return {"status": "error", "message": "Media index out of range."}
+        media_id = media_ids[media_index]
+        media = backend.Media(media_id, pid, name, type)
+        media.load_from_db()
+        mtype = "video" if media.media_type in (utils.VIDEO, utils.AUDIO) else "image"
+        data = {
+            "status": "success",
+            "url": posixpath.join(
+                "/", config.url_base, "file", type, name, media.file_name
+            ),
+            "type": mtype,
+            "alt": (
                 post.alts[media_index]
                 if (media_index < len(post.alts) and media_index != -1)
                 else ""
             ),
-            media_idx=media_index,
-            quote=quote,
-            unquote=unquote,
-        )
-        return card
+            "file_size": media.get_size_str(),
+        }
+        return data
 
     @app.route(
         posixpath.join("/", config.url_base, "post", "<type>", "<name>", "<post_id>")
     )
     @check_auth()
     def _post(type, name, post_id):
-        posts, users, sorted_posts_ids = get_posts_n_users_by_ids(
+        post_groups = get_post_groups_by_ids(
             [post_id], load_reply=True, load_comments=True
         )
+        posts_cnt = sum(len(g) for g in post_groups) if post_groups else 0
+        user_obj = backend.User(name, type)
+        user_obj.load_from_db()
         _banner_url = posixpath.join("/", config.url_base, "banner", type, name)
-        logger.log(
-            f"Loaded {len(posts)} comments for post {post_id}.",
-            verbose=2,
-        )
-        logger.log(
-            "Users involved in the comment thread:", list(users.keys()), verbose=2
-        )
         content_frag = render_template(
             "comments.html",
             highlight_post_id=post_id,
-            sorted_posts_ids=sorted_posts_ids,
-            posts=posts,
-            users=users,
+            post_groups=post_groups,
             url_base=config.url_base,
-            post_found=post_id in posts,
+            post_found=bool(post_groups),
             detailed_view=True,
             _banner_url=_banner_url,
             quote=quote,
@@ -1077,8 +1062,8 @@ def build_app():
             "shorts_icon": "",
             "show_back_btn": True,
             "adjust_padding_top": "4rem",
-            "title_str": "Post by " + users[name].nick if name in users else "Post",
-            "title_secondary_str": f"{len(posts)} posts in this thread",
+            "title_str": "Post by " + user_obj.nick if user_obj else "Post",
+            "title_secondary_str": f"{posts_cnt} posts in this thread",
         }
         return render_template("nav.html", **nav_kwargs)
 
@@ -1096,7 +1081,9 @@ def build_app():
         )
 
     @app.route(
-        posixpath.join("/", config.url_base, "text", "<type>", "<name>", "<filename>")
+        posixpath.join(
+            "/", config.url_base, "text", "<type>", "<name>", "<path:filename>"
+        )
     )
     @check_auth()
     def _text(type, name, filename):
@@ -1148,7 +1135,8 @@ def build_app():
     @check_auth()
     def _file(type, name, fn):
         fn = unquote(fn)
-        file_path = f"{config.fs_bases[type]}/{name}/{fn}"
+        file_path = f"{config.fs_bases.get(type, '.')}/{name}/{fn}"
+        # print(config.fs_bases)
         if not os.path.exists(file_path):
             logger.log(f"File not found: {file_path}.")
             return "File not found.", 404
@@ -1162,7 +1150,7 @@ def build_app():
         methods=["GET", "POST"],
     )
     @check_auth(required_role=utils.ROLE_ADMIN)
-    def _upload_file(type, name, post_id):
+    def _upload(type, name, post_id):
         if request.method == "GET":
             return render_template(
                 "upload.html",
@@ -1170,32 +1158,44 @@ def build_app():
                 post_id=post_id,
             )
         else:
-            # Handle file upload
-            if "file" not in request.files:
-                return "No file part in the request.", 400
-            file = request.files["file"]
-            if file.filename == "":
-                return "No selected file.", 400
-            save_path = f"{config.fs_bases[type]}/{name}/{post_id.split('@')[0]}_{file.filename}"
-            if "/.." in save_path or "../" in save_path or '"' in save_path:
-                logger.log(
-                    f"Security warning: suspicious path for upload: {save_path}.",
-                    type="error",
+            if "url" in request.form and request.form["url"].strip():
+                post = backend.Post(post_id, name, type)
+                post.load_from_db()
+                print(post.text_content)
+                print("Before update, post.extra_data:", post.extra_data)
+                post.extra_data = post.extra_data or {}
+                post.extra_data.setdefault("links", []).append(request.form["url"].strip())
+                print("After update, post.extra_data:", post.extra_data)
+                post.save_to_db()
+                database.db.clear_cache()
+                return f"URL {request.form['url'].strip()} added to post {post_id}."
+            else:
+                # Handle file upload
+                if "file" not in request.files:
+                    return "No file part in the request.", 400
+                file = request.files["file"]
+                if file.filename == "":
+                    return "No selected file.", 400
+                save_path = f"{config.fs_bases.get(type, '.')}/{name}/{post_id.split('@')[0]}_{file.filename}"
+                if "/.." in save_path or "../" in save_path or '"' in save_path:
+                    logger.log(
+                        f"Security warning: suspicious path for upload: {save_path}.",
+                        type="error",
+                    )
+                    return "Invalid file path.", 400
+                # check file size, limit to 100MB
+                file.seek(0, os.SEEK_END)
+                file_length = file.tell()
+                file.seek(0)
+                if file_length > 1000 * 1024 * 1024:
+                    return "File is too large. Max size is 1000MB.", 400
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                file.save(save_path)
+                logger.log(f"File uploaded successfully to {save_path}.")
+                utils.jobs_queue["maintenance"].insert(
+                    0, (f"{name}@{type}", False, False, utils.TYPE_RESCAN)
                 )
-                return "Invalid file path.", 400
-            # check file size, limit to 100MB
-            file.seek(0, os.SEEK_END)
-            file_length = file.tell()
-            file.seek(0)
-            if file_length > 100 * 1024 * 1024:
-                return "File is too large. Max size is 100MB.", 400
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            file.save(save_path)
-            logger.log(f"File uploaded successfully to {save_path}.")
-            utils.download_jobs.insert(
-                0, (f"{name}@{type}", False, False, utils.TYPE_RESCAN)
-            )
-            return f"File uploaded as {save_path.split('/')[-1]}. It will be processed shortly."
+                return f"File uploaded as {save_path.split('/')[-1]}. It will be processed shortly."
 
     @app.route(
         posixpath.join("/", config.url_base, "thumb", "<type>", "<name>", "<path:fn>")
@@ -1213,7 +1213,7 @@ def build_app():
         if not os.path.exists(path):
             logger.log(f"File not found for thumbnail: {path}.")
             return (
-                set_cache_header(send_file("img/error.jpg", mimetype="image/jpeg")),
+                set_cache_header(send_file("img/error.png", mimetype="image/jpeg")),
                 404,
             )
         if "/.." in path or "../" in path or '"' in path:
@@ -1222,31 +1222,17 @@ def build_app():
                 type="error",
             )
             return (
-                set_cache_header(send_file("img/error.jpg", mimetype="image/jpeg")),
+                set_cache_header(send_file("img/error.png", mimetype="image/jpeg")),
                 404,
             )
         thumbnail_path = utils.create_thumbnail(path, size)
         if not thumbnail_path or not os.path.exists(thumbnail_path):
             logger.log(f"Thumbnail not found for {path}.")
             return (
-                set_cache_header(send_file("img/error.jpg", mimetype="image/jpeg")),
+                set_cache_header(send_file("img/error.png", mimetype="image/jpeg")),
                 404,
             )
         return set_cache_header(send_file(thumbnail_path, mimetype="image/jpeg"))
-
-    @app.route(posixpath.join("/", config.url_base, "view", "<type>", "<name>", "<fn>"))
-    @check_auth()
-    def _view(type, name, fn):
-        return render_template(
-            "viewer.html",
-            type=type,
-            user_name=name,
-            file_name=fn,
-            isvideo=fn.endswith(".mp4") or fn.endswith(".webm"),
-            url_base=config.url_base,
-            quote=quote,
-            unquote=unquote,
-        )
 
     @app.route(
         posixpath.join("/", config.url_base, "api", "download"), methods=["POST"]
@@ -1254,28 +1240,37 @@ def build_app():
     @check_auth(required_role=utils.ROLE_ADMIN)
     def _api_download_job():
         data = request.get_json()
-        logger.log("Received data:", data, verbose=3)
-        rescan = data.get("rescan", False)
-        if not rescan:
-            job_type = utils.TYPE_DOWNLOAD
-        else:
+        if data.get("url", ""):
+            logger.log("Received data:", data)
+        rescan = int(data.get("rescan", 0))
+        if rescan == 1:
             job_type = utils.TYPE_RESCAN
+        elif rescan == 2:
+            job_type = utils.TYPE_REBUILD
+        else:
+            job_type = utils.TYPE_DOWNLOAD
         if "url" in data and data["url"]:
             url = data["url"]
-            if "?" in url:
+            if "?" in url and not "e621.net" in url:
                 url = url.split("?")[0]
             full = data.get("full", False)
             media_only = data.get("media_only", False)
-            if re.match(r"[a-zA-Z0-9_.-]+@[a-zA-Z]+", url):
-                utils.download_jobs.insert(0, (url, False, False, utils.TYPE_RESCAN))
-                msg = f"Rescan submitted for user {url}."
+            if re.match(r"[a-zA-Z0-9_.\[\]\(\)-]+@[a-zA-Z]+", url) and job_type in (
+                utils.TYPE_RESCAN,
+                utils.TYPE_REBUILD,
+            ):
+                utils.jobs_queue["maintenance"].append((url, False, False, job_type))
+                if job_type == utils.TYPE_RESCAN:
+                    msg = f"Rescan submitted for user {url}."
+                elif job_type == utils.TYPE_REBUILD:
+                    msg = f"Rebuild submitted for user {url}."
                 logger.log(msg)
                 return jsonify(
                     {
                         "status": "ok",
                         "message": msg,
-                        "current": utils.current_url,
-                        "queue": utils.download_jobs,
+                        "current": utils.get_current_jobs_list(),
+                        "queue": utils.get_full_download_queue(),
                     }
                 )
             elif (
@@ -1291,8 +1286,8 @@ def build_app():
                     {
                         "status": "ok",
                         "message": msg,
-                        "current": utils.current_url,
-                        "queue": utils.download_jobs,
+                        "current": utils.get_current_jobs_list(),
+                        "queue": utils.get_full_download_queue(),
                     }
                 )
             elif not (
@@ -1303,6 +1298,7 @@ def build_app():
                 or "furaffinity" in url
                 or "kemono." in url
                 or "coomer." in url
+                or "e621.net" in url
             ):
                 msg = f"Invalid URL: {url}\n"
                 logger.log(msg)
@@ -1310,8 +1306,8 @@ def build_app():
                     {
                         "status": "ok",
                         "message": msg,
-                        "current": utils.current_url,
-                        "queue": utils.download_jobs,
+                        "current": utils.get_current_jobs_list(),
+                        "queue": utils.get_full_download_queue(),
                     }
                 )
             if "did:" in url:
@@ -1321,8 +1317,8 @@ def build_app():
                     {
                         "status": "ok",
                         "message": msg,
-                        "current": utils.current_url,
-                        "queue": utils.download_jobs,
+                        "current": utils.get_current_jobs_list(),
+                        "queue": utils.get_full_download_queue(),
                     }
                 )
             if re.search(r"\.bsky\.social", url):
@@ -1345,11 +1341,21 @@ def build_app():
                 url = re.sub(r"photo/\d+", "", url)
             if "/video/" in url:
                 url = re.sub(r"video/\d+", "", url)
-            if rescan:
-                utils.download_jobs.insert(0, (url, False, False, utils.TYPE_RESCAN))
+
+            site = utils.identify_site(url)
+            # submit job
+            if rescan == 1:
+                utils.jobs_queue["maintenance"].append(
+                    (url, False, False, utils.TYPE_RESCAN)
+                )
                 msg = "Rescan submitted."
-            elif not (url, full, media_only, job_type) in utils.download_jobs:
-                utils.download_jobs.insert(0, (url, full, media_only, job_type))
+            elif rescan == 2:
+                utils.jobs_queue["maintenance"].append(
+                    (url, False, False, utils.TYPE_REBUILD)
+                )
+                msg = "Rebuild submitted."
+            elif not (url, full, media_only, job_type) in utils.jobs_queue[site]:
+                utils.jobs_queue[site].append((url, full, media_only, job_type))
                 msg = f"Job added.\n"
             else:
                 msg = f"{url} already in download queue.\n"
@@ -1360,8 +1366,8 @@ def build_app():
             {
                 "status": "ok",
                 "message": msg,
-                "current": utils.current_url,
-                "queue": utils.download_jobs,
+                "current": utils.get_current_jobs_list(),
+                "queue": utils.get_full_download_queue(),
             }
         )
 
@@ -1371,6 +1377,35 @@ def build_app():
         logger.log("Interrupt command received via API.")
         run_command.interrupt()
         return {"status": "ok", "message": "Interrupt signal sent to the downloader."}
+
+    @app.route(
+        posixpath.join("/", config.url_base, "api", "rename_user"), methods=["POST"]
+    )
+    @check_auth(required_role=utils.ROLE_ADMIN)
+    def _api_rename_user():
+        data = request.get_json()
+        old_uid = data.get("old_uid", "")
+        new_uid = data.get("new_uid", "").lower()
+        if not old_uid or not new_uid:
+            return jsonify(
+                {"status": "error", "message": "Both old_uid and new_uid are required."}
+            )
+        try:
+            utils.rename_user_and_fs_folder(old_uid, new_uid)
+            return jsonify(
+                {
+                    "status": "ok",
+                    "message": f"User renamed from {old_uid} to {new_uid} successfully.",
+                }
+            )
+        except Exception as e:
+            logger.log(
+                f"Error renaming user from {old_uid} to {new_uid}: {e}", type="error"
+            )
+            logger.log(traceback.format_exc(), type="error")
+            return jsonify(
+                {"status": "error", "message": f"Error renaming user: {str(e)}"}
+            )
 
     @app.route(posixpath.join("/", config.url_base, "shorts"), methods=["GET"])
     @check_auth()
@@ -1416,10 +1451,10 @@ def build_app():
                 media_id, count = db.get_a_video(
                     anchor=anchor, on_anchor=on_anchor, sort_type=sort_type, uid=uid
                 )
-            elif backend.db.get_video_count() == 0:
+            elif database.db.get_video_count() == 0:
                 media_id, count = None, 0
             else:
-                media_id, count = backend.db.get_a_video(
+                media_id, count = database.db.get_a_video(
                     anchor=anchor, on_anchor=on_anchor, sort_type=sort_type
                 )
         except Exception as e:
@@ -1441,6 +1476,7 @@ def build_app():
         post.load_from_db()
         user = backend.User(post.user_name, post.type)
         user.load_from_db()
+        post.user = user
         data = {
             "status": "ok",
             "message": "",
@@ -1465,7 +1501,7 @@ def build_app():
             "post_id": post.post_id,
             "media_id": media.media_id,
             "fav": bool(
-                backend.db.query_rows(
+                database.db.query_rows(
                     selected_table="fav", key="post_id", value=post.post_id
                 )
             ),
@@ -1524,6 +1560,7 @@ def build_app():
             url_base=config.url_base,
             shorts_decoration="",
             shorts_icon="",
+            adjust_padding_top="0.5rem",
         )
 
     @app.route(
@@ -1555,6 +1592,10 @@ def build_app():
                     text = data.get("text", "")
                     tokens = utils.tokenize_text(text)
                     return jsonify({"status": "ok", "result": tokens})
+                elif test_cat == "search_suggestion":
+                    query = data.get("text", "")
+                    suggestions = utils.get_search_suggestions(query)
+                    return jsonify({"status": "ok", "result": suggestions})
                 else:
                     return jsonify(
                         {"status": "error", "message": "Unknown test category."}
@@ -1580,7 +1621,7 @@ def build_app():
             if not post.load_from_db():
                 logger.log(f"Post [{post_id}] not found.")
                 continue
-            for row in backend.db.query_rows(
+            for row in database.db.query_rows(
                 selected_table="media", key="post_id", value=post_id
             ):
                 media_id = row[0]
@@ -1642,6 +1683,7 @@ def build_app():
             "status": "ok",
             "message": f"Users {uids} have been added to group {group_name}.",
         }
+    
 
     @app.route(
         posixpath.join("/", config.url_base, "api", "ungroup_users"), methods=["POST"]
@@ -1649,14 +1691,28 @@ def build_app():
     @check_auth(required_role=utils.ROLE_ADMIN)
     def _api_ungroup_users():
         data = request.get_json()
-        group_name = data.get("group_name", "")
-        uids = backend.get_uids_in_group(group_name)
+        pairs = data.get("pairs", [])
+        print("Ungrouping users with pairs:", pairs)
+        for pair in pairs:
+            uid = pair.get("uid", "")
+            group_id = pair.get("group_id", "")
+            backend.remove_user_from_group(uid, group_id)
+        return {"status": "ok", "message": "Users removed from group."}
+
+    @app.route(
+        posixpath.join("/", config.url_base, "api", "ungroup"), methods=["POST"]
+    )
+    @check_auth(required_role=utils.ROLE_ADMIN)
+    def _api_ungroup():
+        data = request.get_json()
+        group_id = data.get("group_id", "")
+        uids = backend.get_uids_in_group(group_id)
         for uid in uids:
-            backend.remove_user_from_group(uid, group_name)
-        logger.log(f"Users {uids} have been removed from group {group_name} by admin.")
+            backend.remove_user_from_group(uid, group_id)
+        logger.log(f"Users {uids} have been removed from group {group_id} by admin.")
         return {
             "status": "ok",
-            "message": f"Users {uids} have been removed from group {group_name}.",
+            "message": f"Users {uids} have been removed from group {group_id}.",
         }
 
     @app.route(
@@ -1698,12 +1754,14 @@ def build_app():
     def _api_upload_cookies():
         file = request.files["cookies"]
         type = request.form.get("type", "")
-        if type not in ["x", "bsky", "reddit", "fa"]:
+        if type not in ["x", "bsky", "reddit", "fa", "e621"]:
             return {"status": "error", "message": "Invalid type."}
         if type == "x":
             save_path = "x.com_cookies.txt"
         elif type == "fa":
             save_path = "fadl/cookies.txt"
+        elif type == "e621":
+            save_path = "e6dl/cookies.txt"
         else:
             return {
                 "status": "error",
@@ -1724,17 +1782,35 @@ def build_app():
     @check_auth(required_role=utils.ROLE_ADMIN)
     def _api_rescan():
         full = request.args.get("full", "0") == "1"
-        backend.scan_for_users("x")
-        backend.scan_for_users("bsky")
-        backend.scan_for_users("reddit")
-        backend.scan_for_users("fa")
-        backend.scan_for_users("patreon")
-        return {"status": "ok", "message": "Rescan completed."}
+
+        def delayed_rescan():
+            logger.log("Rescan will start in 5 seconds...")
+            time.sleep(5)
+            backend.scan_for_users("x")
+            backend.scan_for_users("bsky")
+            backend.scan_for_users("reddit")
+            backend.scan_for_users("fa")
+            backend.scan_for_users("patreon")
+            backend.scan_for_users("e621")
+            if full:
+                backend.scan_for_posts("x")
+                backend.scan_for_posts("bsky")
+                backend.scan_for_posts("reddit")
+                backend.scan_for_posts("fa")
+                backend.scan_for_posts("patreon")
+                backend.scan_for_posts("e621")
+            backend.scan_custom_user(scan_posts=not full)
+            database.db.commit()
+            backend.all_users = backend.get_users()
+            logger.log("Rescan completed.")
+
+        Thread(target=delayed_rescan, daemon=True).start()
+        return {"status": "ok", "message": "Rescan started."}
 
     @app.route(posixpath.join("/", config.url_base, "api", "inspect_post/<post_id>"))
     @check_auth()
     def _api_inspect_post(post_id):
-        post_rows = backend.db.query_rows(
+        post_rows = database.db.query_rows(
             selected_table="posts", key="post_id", value=post_id, ignore_cache=True
         )
         if not post_rows:
@@ -1777,14 +1853,14 @@ def build_app():
                         f"Failed to fetch {subpath}, status code: {r.status_code}"
                     )
                 bin_ = r.content
-                if len(bin_) < 1024:
+                if len(bin_) < 100:
                     raise Exception("Too small")
                 with open(cache_path, "wb") as f:
                     f.write(bin_)
                 logger.log(f"Cached to: {cache_path}")
             except Exception as e:
                 logger.log(e, type="error")
-                with open("img/empty.png", "rb") as f1:
+                with open("img/error.png", "rb") as f1:
                     with open(cache_path, "wb") as f2:
                         f2.write(f1.read())
                 logger.log(
@@ -1793,35 +1869,80 @@ def build_app():
                 )
             return set_cache_header(send_file(cache_path))
 
+    @app.route(posixpath.join("/", config.url_base, "api", "call"))
+    @check_auth(required_role=utils.ROLE_ADMIN)
+    def _api_call():
+        func_name = request.args.get("func", "")
+        args = request.args.get("args", "")
+        args = args.split(",") if args else []
+        if not func_name:
+            return {"status": "error", "message": "Function name is required."}
+        if func_name == "build_search_suggestions":
+            Thread(target=utils.build_search_suggestions, daemon=True).start()
+            return {"status": "ok", "message": "Search suggestions rebuilt."}
+        else:
+            return {"status": "error", "message": f"Unknown function: {func_name}"}
+
+    @app.route(posixpath.join("/", config.url_base, "api", "search_suggestions"))
+    @check_auth()
+    def _api_search_suggestions():
+        q = request.args.get("q", "")
+        q = q.split(", ")[-1].lower().strip()
+        logger.log(f"Search suggestions requested for query: '{q}'", verbose=0)
+        suggestions = utils.get_search_suggestions(q)
+        return {"status": "success", "message": "", "suggestions": suggestions}
+
     return app
 
 
 def init(skip_scan, skip_scan_users):
+    utils.current_status = utils.SCANNING
+    logger.log("Starting initial scan of users and posts...")
     if not skip_scan_users:
         backend.scan_for_users("x")
         backend.scan_for_users("bsky")
         backend.scan_for_users("reddit")
         backend.scan_for_users("fa")
         backend.scan_for_users("patreon")
+        backend.scan_for_users("e621")
     if not skip_scan:
         backend.scan_for_posts("x")
         backend.scan_for_posts("bsky")
         backend.scan_for_posts("reddit")
         backend.scan_for_posts("fa")
         backend.scan_for_posts("patreon")
-    backend.db.commit()
+        backend.scan_for_posts("e621")
+    backend.scan_custom_user(scan_posts=not skip_scan)
+    database.db.commit()
     backend.all_users = backend.get_users()
     logger.log("Scan finished.")
+    utils.current_status = utils.RUNNING
 
     if args.update_daemon:
         logger.log("Starting update daemon...")
         Thread(target=utils.update_daemon, daemon=True).start()
 
+    utils.global_running_flag = True
+    for site in list(config.fs_bases.keys()) + ["maintenance"]:
+        if not site in utils.jobs_queue:
+            continue
+        if not site in utils.running_workers:
+            worker = utils.DownloadWorker(db, site)
+            worker.setDaemon(True)
+            worker.start()
+            utils.running_workers.add(site)
+        else:
+            logger.log(f"Worker for {site} already running.")
+            logger.log(
+                f"Probably you are using hot reload feature of flask, which will restart the app but not the whole process, so the worker thread is still running in background. No need to worry about it."
+            )
+    logger.log("Download worker started.")
+
 
 def shutdown_cleanup():
     print("Shutting down, performing cleanup...")
     utils.global_running_flag = False
-    backend.db.commit()
+    database.db.commit()
     logger.log("Cleanup done. Goodbye!")
 
 
@@ -1841,21 +1962,16 @@ def wsgi_app(skip_scan=False, skip_scan_users=False, config_file="config.json"):
 
 def delayed_stop():
     def stop():
-        backend.db.commit()
+        database.db.commit()
         time.sleep(1)  # Wait a moment to ensure the response is sent before stopping
         os.kill(os.getpid(), signal.SIGTERM)
 
     Thread(target=stop, daemon=True).start()
 
 
-db = backend.Database("data.db", "fav.db")
+db = database.Database("data.db", "fav.db")
 db.prepare_db()
-backend.set_db(db)
-utils.global_running_flag = True
-worker = utils.DownloadWorker(db)
-worker.setDaemon(True)
-worker.start()
-logger.log("Download worker started.")
+database.set_db(db)
 
 if args.monitor_timeline:
     logger.log("Initializing bsky monitor...")

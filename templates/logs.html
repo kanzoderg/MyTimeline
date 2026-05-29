@@ -4,25 +4,39 @@
 <head>
     <title>Logs</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <link rel="stylesheet" href="{{url_base}}/css/colors.css" />
     <link rel="stylesheet" href="{{url_base}}/css/style.css" />
+    <link rel="stylesheet" href="{{url_base}}/css/light_mode.css" disabled />
     <style>
         body {
-            background-color: #000;
+            background-color: var(--bg-color);
             color: var(--text-color);
         }
 
         #live {
             position: fixed;
-            bottom: 0.5rem;
+            bottom: 3.3rem;
             right: 1rem;
             font-size: 0.9rem;
         }
 
         #logs {
+            position: fixed;
+            top: 3rem;
+            left: 0;
+            right: 0;
+            bottom: 6.2rem;
             user-select: text;
             height: auto;
-            max-height: calc(100vh - 4rem);
             text-align: left;
+            background-color: var(--bg-color-alt);
+        }
+
+        #auto_rl_toggle_group {
+            position: fixed;
+            width: 15rem;
+            bottom: 2rem;
+            right: 0.3rem;
         }
     </style>
 </head>
@@ -30,24 +44,45 @@
 <body>
     <div id="logs">
     </div>
-    <div id="live" class="big_btn">
+    <!-- <div id="live" class="big_btn">
         <input type="radio" id="live_update" name="live_update" onclick="toggle_live()">
         <label for="live_update">Auto Reload</label>
+    </div> -->
+    <div class="menu_group" id="auto_rl_toggle_group">
+        <div class="menu_item" id="auto_rl_toggle" onclick="toggle_value('auto_rl_toggle','auto_rl')">
+            <img src="{{url_base}}/img/reload.svg" class="inline_icon">
+            <div class="menu_item_desc">
+                <div class="menu_item_desc_title">Auto Reload</div>
+            </div>
+            <div class="menu_toggle">
+                <div class="menu_toggle_thumb"></div>
+            </div>
+        </div>
     </div>
+    <a id="back_btn" class="float_btn" onclick="window.history.back(); return false;">
+        <img src="{{url_base}}/img/left.svg" style="transform: scale(0.8);">
+    </a>
+
     <script>
         var url_base = "{{url_base}}";
     </script>
-    </script>
-    <script src="{{url_base}}/js/logs.js"></script>
+
+    <script src="{{url_base}}/js/helper.js"></script>
     <script>
         setTimeout(() => {
             update_logs(200, true)
         }, 500);
+
         setInterval(() => {
-            if (live_update_checkbox.checked)
-                update_logs(200, false);
+            if (get_bool("auto_rl")) {
+                update_logs(200, true);
+            }
         }, 2000);
-        live_update = live_update_checkbox.checked;
+
+        window.onload = function () {
+            init_toggle('auto_rl_toggle', 'auto_rl');
+        };
+
     </script>
 </body>
 

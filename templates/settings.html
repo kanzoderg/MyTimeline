@@ -1,14 +1,109 @@
-<div class="setting_items">
-    <div class="setting_item big_btn translucent" id="info"></div>
-    <!-- <div id="logs" class="logs_settings"></div> -->
-    <a class="setting_item big_btn translucent" href="{{url_base}}/logs">View Full Logs</a>
-    <a class="setting_item big_btn translucent" href="{{url_base}}/logout">Logout</a>
-    <a class="setting_item big_btn translucent" onclick="rescan()">Rescan Users</a>
-    <!-- <a class="setting_item big_btn translucent" onclick="rescan(1)">Full Rescan</a> -->
-    <a class="setting_item big_btn translucent" onclick="upload_cookies('x')">Upload cookies.txt for X</a>
-    <a class="setting_item big_btn translucent" onclick="upload_cookies('fa')">Upload cookies.txt for Furaffinity</a>
-    <a class="setting_item big_btn translucent" onclick="stop_server()">Stop</a>
+<div class="menu_desc">Logs</div>
+<div class="menu_group">
+    <a class="menu_item" href="{{url_base}}/logs" onclick="show_content_in_frame(event, this);">
+        <img src="{{url_base}}/img/logs.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Full Logs</div>
+        </div>
+        <img src="{{url_base}}/img/down.svg" class="right_arrow_icon">
+    </a>
 </div>
+
+<div class="menu_desc">Settings</div>
+<div class="menu_group">
+    <div class="menu_item" id="inf_scroll_toggle" onclick="toggle_value('inf_scroll_toggle','inf_scroll')">
+        <img src="{{url_base}}/img/scroll.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Infinite Scroll</div>
+        </div>
+        <div class="menu_toggle">
+            <div class="menu_toggle_thumb"></div>
+        </div>
+    </div>
+</div>
+
+<div class="menu_desc">Maintenance</div>
+<div class="menu_group">
+
+    <a class="menu_item" href="{{url_base}}/test" onclick="show_content_in_frame(event, this);">
+        <img src="{{url_base}}/img/spanner.svg" class="inline_icon" style="scale: 1.2;">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Test Page</div>
+            <div class="menu_item_desc_text">Access the test page.</div>
+        </div>
+        <img src="{{url_base}}/img/down.svg" class="right_arrow_icon">
+    </a>
+    <a class="menu_item" onclick="call_server_function('build_search_suggestions')">
+        <img src="{{url_base}}/img/search-sort.svg" class="inline_icon" style="scale: 1.7;">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Build Search Suggestions</div>
+            <div class="menu_item_desc_text">Generate search suggestions.</div>
+        </div>
+    </a>
+    <a class="menu_item" onclick="rescan()">
+        <img src="{{url_base}}/img/scan.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Rescan Users</div>
+            <div class="menu_item_desc_text">Update user information and profiles</div>
+        </div>
+    </a>
+    <a class="menu_item" onclick="rescan(true)">
+        <img src="{{url_base}}/img/scan.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Rescan Posts</div>
+            <div class="menu_item_desc_text">Update post information and media</div>
+        </div>
+    </a>
+    <a class="menu_item" onclick="upload_cookies('x')">
+        <img src="{{url_base}}/img/cookie.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Upload Cookies for X</div>
+            <div class="menu_item_desc_text">Upload your cookies.txt file for X (Twitter)</div>
+        </div>
+    </a>
+    <a class="menu_item" onclick="upload_cookies('fa')">
+        <img src="{{url_base}}/img/cookie.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Upload Cookies for Furaffinity</div>
+            <div class="menu_item_desc_text">Upload your cookies.txt file for Furaffinity</div>
+        </div>
+    </a>
+    <a class="menu_item" onclick="upload_cookies('e621')">
+        <img src="{{url_base}}/img/cookie.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Upload Cookies for e621</div>
+            <div class="menu_item_desc_text">Upload your cookies.txt file for e621</div>
+        </div>
+    </a>
+    <a class="menu_item">
+        <div class="menu_item_desc" style="max-width: unset;">
+            <div class="menu_item_desc_text">For more maintenance options, use <code>db_tools.py</code>.</div>
+        </div>
+    </a>
+</div>
+
+<div class="menu_desc">Status</div>
+<div class="menu_group">
+    <div class="menu_item" id="info"></div>
+</div>
+
+<div class="menu_desc">Sessions</div>
+<div class="menu_group">
+    <a class="menu_item" href="{{url_base}}/logout">
+        <img src="{{url_base}}/img/exit.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Logout</div>
+        </div>
+    </a>
+    <a class="menu_item" onclick="stop_server()">
+        <img src="{{url_base}}/img/stop.svg" class="inline_icon">
+        <div class="menu_item_desc">
+            <div class="menu_item_desc_title">Stop Server</div>
+            <div class="menu_item_desc_text">Terminate the running server instance</div>
+        </div>
+    </a>
+</div>
+
 <script>
     // {{url_base}}/api/stats
     function fetch_stats() {
@@ -43,8 +138,15 @@
     }
 
     function rescan(full = false) {
-        if (!confirm("Are you sure you want to rescan users? This may take a while.")) {
-            return;
+        if (!full) {
+            if (!confirm("Are you sure you want to rescan users? This may take a while.")) {
+                return;
+            }
+        }
+        else {
+            if (!confirm("Are you sure you want to do a full rescan? This will rescan all user posts. This may take a very long time.")) {
+                return;
+            }
         }
         fetch('{{url_base}}/api/rescan?full=' + (full ? '1' : '0'), {
             method: 'GET',
@@ -61,10 +163,7 @@
         });
     }
 
-    // setTimeout(() => {
-    //     update_logs(20, true)
-    // }, 500)
-    // setInterval(() => {
-    //     update_logs(20, false)
-    // }, 2000)
+    window.onload = function () {
+        init_toggle('inf_scroll_toggle', 'inf_scroll');
+    };
 </script>

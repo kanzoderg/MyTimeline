@@ -1,5 +1,5 @@
 from PIL import Image
-import time, os, re, sys, json, math
+import time, os, re, sys, json, math, shutil
 import traceback
 import subprocess
 import signal, psutil
@@ -14,6 +14,10 @@ from html import escape
 from flask import request
 
 
+def md5_hash(text):
+    return md5(text.encode()).hexdigest()
+
+
 def time_it(func):
     def wrapper(*args, **kwargs):
         start_time = time.time()
@@ -23,6 +27,43 @@ def time_it(func):
         return result
 
     return wrapper
+
+
+def identify_site(url):
+    if "x.com" in url or "twitter.com" in url:
+        return "x"
+    elif "bsky.app" in url:
+        return "bsky"
+    elif "furaffinity.net" in url:
+        return "fa"
+    elif "patreon.com" in url:
+        return "patreon"
+    elif ("kemono." in url) or ("coomer." in url):
+        return "patreon"
+    elif "e621.net" in url:
+        return "e621"
+    elif "reddit.com" in url:
+        return "reddit"
+    else:
+        return "maintenance"
+
+
+def id2time_gueeser(id_, type_):
+    try:
+        if type_ == "x":
+            # snowflake id time guessing
+            timestamp = (int(id_) >> 22) + 1288834974657
+            return timestamp / 1000
+        elif type_ == "e621":
+            # e621 id time guessing
+            # magic number got by linear regression
+            ts = 56.55 * int(id_) + 1417571635
+            return ts
+        else:
+            return int(time.time())
+    except Exception as e:
+        logger.log("Error in id2time_gueeser:", traceback.format_exc(), type="error")
+        return int(time.time())
 
 
 def strip_suffix(text, suffix):
@@ -55,13 +96,37 @@ if not config.config_read:
     print("Unit test: config not read, reading now...")
     config.read_config()
 
-import backend, logger
+import backend, logger, database
 from run_command import run_command
 
 global_lock = Lock()
+scan_lock = Lock()
 global_running_flag = True
 download_jobs = []
-current_url = ""
+jobs_queue = {
+    "x": [],
+    "bsky": [],
+    "reddit": [],
+    "fa": [],
+    "patreon": [],
+    "e621": [],
+    "maintenance": [],
+}
+current_jobs = dict()
+
+
+def get_full_download_queue():
+    full_queue = []
+    for site in jobs_queue:
+        full_queue.extend(jobs_queue[site])
+    return full_queue
+
+
+def get_current_jobs_list():
+    return list(current_jobs.values())
+
+
+running_workers = set()
 has_new_download = True
 
 busy_flag = False
@@ -112,6 +177,13 @@ PLAIN_TEXT = 8
 
 TYPE_DOWNLOAD = 0
 TYPE_RESCAN = 1
+TYPE_REBUILD = 2
+
+STARTING = 0
+RUNNING = 1
+SCANNING = 2
+
+current_status = STARTING
 
 
 def media_type_from_extension(extension):
@@ -148,9 +220,14 @@ exclude_files = [
 allowed_to_proxy = [
     "furaffinity.net/",
     "ytimg.com",
+    "youtube.com",
+    "youtu.be",
     "fanbox.cc",
     "pixiv",
     "itch.",
+    "e621.net/",
+    "storage.googleapis.com/",
+    "googleusercontent.com/",
     # "patreon.com",
 ]
 
@@ -160,16 +237,18 @@ allowed_to_probe = [
     "fanbox.cc",
     "pixiv",
     "itch.io",
+    "querie.me/answer",
+    "forms.gle",
     # "patreon.com",
 ]
 
 allowed_to_embed = [
-    "furaffinity.net/view/",
-    "furaffinity.net/journal/",
-    "at://",
-    "x.com/",
-    "twitter.com/",
-    "bsky.app/profile/",
+    re.compile(r"furaffinity\.net/view/"),
+    re.compile(r"furaffinity\.net/journal/"),
+    re.compile(r"at\://"),
+    re.compile(r"x\.com/"),
+    re.compile(r"twitter\.com/[a-zA-Z0-9\-\_\.]+/status/"),
+    re.compile(r"bsky\.app/profile/[a-zA-Z0-9\-\_\.\:]+/post/[a-zA-Z0-9]+"),
 ]
 
 
@@ -189,9 +268,23 @@ def check_allowed_to_probe(url):
 
 def check_allowed_to_embed(url):
     for link in allowed_to_embed:
-        if link in url:
+        if isinstance(link, re.Pattern):
+            if link.search(url):
+                return True
+        elif link in url:
             return True
     return False
+
+
+def extract_domain(url):
+    try:
+        domain = url.replace("http://", "").replace("https://", "").split("/")[0]
+        return domain
+    except Exception as e:
+        logger.log(
+            "Error extracting domain from URL:", traceback.format_exc(), type="error"
+        )
+        return ""
 
 
 ROLE_UNAUTHORIZED = 0
@@ -302,6 +395,13 @@ def post(url, json=None, headers=None):
     raise Exception(f"Failed to POST {url} after 3 attempts")
 
 
+def format_tags(tags):
+    if not tags:
+        return ""
+    formatted = " ".join([f"#{tag}" for tag in tags])
+    return formatted
+
+
 def get_mem_usage_mb():
     process = psutil.Process(os.getpid())
     mem_info = process.memory_info()
@@ -311,10 +411,9 @@ def get_mem_usage_mb():
 def get_stats():
     data = {
         "memory_usage_mb": get_mem_usage_mb(),
-        "download_queue_length": len(download_jobs),
         "restart_needed": restart_needed,
         "busy": busy_flag,
-        "post_count": backend.db.get_post_count(),
+        "post_count": database.db.get_post_count(),
     }
     return data
 
@@ -374,7 +473,7 @@ def create_thumbnail(path, thumbnail_size=config.thumbnail_size):
     config.cache_path = os.path.expanduser(config.cache_path)
     if not os.path.exists(config.cache_path):
         os.makedirs(config.cache_path)
-    thumbnail_path = md5(path.encode()).hexdigest() + f"_{thumbnail_size}.jpg"
+    thumbnail_path = md5_hash(path) + f"_{thumbnail_size}.jpg"
     thumbnail_path = f"{thumbnail_path[0:2]}/{thumbnail_path[2:4]}/{thumbnail_path}"
     thumbnail_path = os.path.join(config.cache_path, thumbnail_path)
     if os.path.exists(thumbnail_path):
@@ -395,37 +494,56 @@ def create_thumbnail(path, thumbnail_size=config.thumbnail_size):
 
 
 class DownloadWorker(Thread):
-    def __init__(self, db):
+    def __init__(self, db, perferred_site="maintenance"):
         super().__init__()
         self.db = db
+        self.perferred_site = perferred_site
 
     def run(self):
-        global download_jobs, global_lock, global_running_flag, current_url, has_new_download, busy_flag
+        global download_jobs, jobs_queue, global_lock, global_running_flag, has_new_download, busy_flag
         while global_running_flag:
             try:
+                time.sleep(1)
+                url = ""
+                job_id = str(uuid())
                 with global_lock:
-                    if len(download_jobs) > 0:
-                        current_url, full, media_only, job_type = download_jobs.pop(0)
-                        logger.log("-->", current_url, full, media_only)
-                        logger.log(f"Downloading {current_url}")
+                    ### Test code, don't forget to remove
+                    if len(jobs_queue.get(self.perferred_site, [])) > 0:
+                        url, full, media_only, job_type = jobs_queue[
+                            self.perferred_site
+                        ].pop(0)
+                        current_jobs[job_id] = {
+                            "url": url,
+                            "full": full,
+                            "media_only": media_only,
+                            "job_type": job_type,
+                        }
+                        logger.log(
+                            f"Processing {url} from {self.perferred_site} queue."
+                        )
                     else:
-                        time.sleep(1)
+                        # logger.log(f"No jobs in {self.perferred_site} queue.")
                         continue
+
                 if config.custom_gallery_dl_location:
                     cmd = [os.path.expanduser(config.custom_gallery_dl_location)]
                 else:
                     cmd = ["gallery-dl"]
-                if re.match(r"[a-zA-Z0-9_.-]+@[a-zA-Z]+", current_url):
-                    # This is a rescan job
-                    name, type = current_url.split("@")
+                if (job_type == TYPE_RESCAN or job_type == TYPE_REBUILD) and re.match(
+                    r"[a-zA-Z0-9_.\[\]\(\)-]+@[a-zA-Z]+", url
+                ):
+                    name, type = url.split("@")
                     cmd = []
                     user_fs_path = f"{config.fs_bases[type]}/{name}/"
+                    if job_type == TYPE_REBUILD:
+                        # for rebuild we need to remove user from database to trigger full rescan and metadata rebuild
+                        database.db.remove_user(f"{name}@{type}")
                     job_type = TYPE_RESCAN
-                elif "bsky" in current_url:
+                elif "bsky" in url:
                     # cookies not avalible yet
-                    name = re.search(r"profile/([a-zA-Z0-9\-\_\.]+)", current_url)
+                    name = re.search(r"profile/([a-zA-Z0-9\-\_\.]+)", url)
                     if not name:
-                        logger.log("Invalid bsky URL:", current_url)
+                        logger.log("Invalid bsky URL:", url)
                         continue
                     name = name.group(1).lower()
                     user_fs_path = f"{config.fs_bases['bsky']}/{name}/"
@@ -436,18 +554,19 @@ class DownloadWorker(Thread):
                             if media_only
                             else "gdl_conf/gallery-dl-config.json"
                         ),
-                        current_url,
+                        url,
                         "-D",
                         user_fs_path,
                     ]
                     cmd = [str(x) for x in cmd]
                     type = "bsky"
-                elif "x.com" in current_url or "twitter.com" in current_url:
-                    name = re.search(
-                        r"x.com/([a-zA-Z0-9\-\_\.]+)", current_url
-                    ) or re.search(r"twitter.com/([a-zA-Z0-9\-\_\.]+)", current_url)
+                elif "x.com" in url or "twitter.com" in url:
+                    name = re.search(r"x.com/([a-zA-Z0-9\-\_\.]+)", url) or re.search(
+                        r"twitter.com/([a-zA-Z0-9\-\_\.]+)", url
+                    )
                     if not name:
-                        logger.log("Invalid x.com URL:", current_url)
+                        logger.log("Invalid x.com URL:", url)
+                        del current_jobs[job_id]
                         continue
                     name = name.group(1).lower()
                     user_fs_path = f"{config.fs_bases['x']}/{name}/"
@@ -461,7 +580,7 @@ class DownloadWorker(Thread):
                             ),
                             "-C",
                             config.cookies_list["x"],
-                            current_url,
+                            url,
                             "-D",
                             user_fs_path,
                         ]
@@ -470,19 +589,20 @@ class DownloadWorker(Thread):
                         cmd += [
                             "-c",
                             "gdl_conf/gallery-dl-config.json",
-                            current_url,
+                            url,
                             "-D",
                             user_fs_path,
                         ]
                         cmd = [str(x) for x in cmd]
                     type = "x"
-                elif "reddit.com" in current_url:
-                    name = re.search(r"reddit.com/r/([a-zA-Z0-9\-\_\.]+)", current_url)
+                elif "reddit.com" in url:
+                    name = re.search(r"reddit.com/r/([a-zA-Z0-9\-\_\.]+)", url)
                     if not name:
-                        if "reddit.com/user/" in current_url:
+                        if "reddit.com/user/" in url:
                             name = "reddit_users"
                         else:
-                            logger.log("Invalid reddit URL:", current_url)
+                            logger.log("Invalid reddit URL:", url)
+                            del current_jobs[job_id]
                             continue
                     else:
                         name = name.group(1).lower()
@@ -490,19 +610,19 @@ class DownloadWorker(Thread):
                     cmd += [
                         "-c",
                         "gdl_conf/gallery-dl-config.json",
-                        current_url,
+                        url,
                         "-D",
                         user_fs_path,
                     ]
                     type = "reddit"
-                elif "furaffinity" in current_url:
+                elif "furaffinity" in url:
                     name = re.search(
                         r"furaffinity.net/(user|gallery|scraps|journals)/([\w\d_\-\.\~]+)",
-                        current_url,
+                        url,
                     )
                     user_fs_path = os.path.expanduser(config.fs_bases["fa"])
                     if not name:
-                        name = "ignore"
+                        name = "TBD"
                     else:
                         name = name.group(2).lower()
                     cmd = [
@@ -512,42 +632,55 @@ class DownloadWorker(Thread):
                         user_fs_path,
                         "--user-agent",
                         f"\"{global_headers['User-Agent']}\"",
-                        current_url,
+                        url,
                     ]
                     if full:
                         cmd += ["-f"]
                     type = "fa"
-                elif "patreon.com" in current_url:
-                    current_url = current_url.strip("/")
-                    name = current_url.split("/")[-1].lower()
+                elif "patreon.com" in url:
+                    url = url.strip("/")
+                    name = url.split("/")[-1].lower()
                     user_fs_path = os.path.expanduser(
                         f"{config.fs_bases['patreon']}/{name}/"
                     )
                     cmd = ["echo not supported yet"]
                     job_type = TYPE_RESCAN
                     type = "patreon"
-                elif ("kemono." in current_url) or ("coomer." in current_url):
-                    current_url = current_url.split("?")[0].strip("/")
-                    if "kemono." in current_url:
-                        name = "ignore"
-                    elif "coomer." in current_url:
-                        name = re.search(r"user/([\w\d_\-\.]+)", current_url)
+                elif ("kemono." in url) or ("coomer." in url):
+                    url = url.split("?")[0].strip("/")
+                    if "kemono." in url:
+                        name = "TBD"
+                    elif "coomer." in url:
+                        name = re.search(r"user/([\w\d_\-\.]+)", url)
                         if not name:
-                            name = "ignore"
+                            name = "TBD"
                         else:
                             name = name.group(1).lower()
                     user_fs_path = os.path.expanduser(f"{config.fs_bases['patreon']}")
                     cmd = [
                         config.current_python,
-                        "kemonodl",
-                        "--target-dir",
+                        "kemonodl/kemonodl.py",
+                        "-o",
                         user_fs_path,
-                        current_url,
+                        url,
                         "--no-interactive",
                     ]
                     type = "patreon"
+                elif "e621.net" in url:
+                    name = "TBD"
+                    user_fs_path = os.path.expanduser(config.fs_bases["e621"])
+                    cmd = [
+                        config.current_python,
+                        "e6dl/e6dl.py",
+                        f"'{url}'",
+                        "-o",
+                        f"'{user_fs_path}'",
+                        "--no-interactive",
+                    ]
+                    type = "e621"
                 else:
-                    logger.log("Unsupported URL:", current_url)
+                    logger.log("Unsupported URL:", url)
+                    del current_jobs[job_id]
                     continue
                 if config.proxy:
                     cmd += ["--proxy", config.proxy]
@@ -591,11 +724,12 @@ class DownloadWorker(Thread):
                             ("AuthorizationError", trigger_action),
                             ("AccountTakedown", trigger_action),
                         ],
+                        tag=f"{type}:{name}",
                     )
                 else:
                     logger.log("This is a rescan job, not performing download.")
                 try:
-                    if name == "ignore":
+                    if name == "TBD":
                         logger.log("Guessing username now...")
                         existing_users = os.listdir(user_fs_path)
                         existing_users.sort(
@@ -608,13 +742,17 @@ class DownloadWorker(Thread):
                             name = existing_users[0]
                             logger.log("Using most recently updated user:", name)
                         else:
-                            name = "ignore"
+                            name = "TBD"
                     busy_flag = True
-                    backend.scan_for_users(type, name)
-                    if job_type == TYPE_DOWNLOAD:
-                        backend.scan_for_posts(type, name)
+                    if type in ["x", "bsky", "reddit", "fa", "patreon", "e621"]:
+                        backend.scan_for_users(type, name)
+                        if job_type == TYPE_DOWNLOAD:
+                            backend.scan_for_posts(type, name)
+                        else:
+                            backend.scan_for_posts(type, name, True)
                     else:
-                        backend.scan_for_posts(type, name, True)
+                        # custom scan
+                        backend.scan_custom_user(scan_posts=True, force=True)
                     self.db.commit()
                     has_new_download = True
                     backend.query_cache = dict()
@@ -624,46 +762,59 @@ class DownloadWorker(Thread):
                     busy_flag = False
                     logger.log(traceback.format_exc(), type="error")
                     logger.log("Scan Failed.", type="error")
-                current_url = ""
+                url = ""
             except Exception as e:
                 logger.log(
                     "Error in download worker:", traceback.format_exc(), type="error"
                 )
                 time.sleep(1)
+            finally:
+                if job_id in current_jobs:
+                    del current_jobs[job_id]
+                if url:
+                    logger.log(f"Finished processing {url}.")
 
 
 def update_daemon():
     global download_jobs, global_running_flag, has_new_download, busy_flag
-    try:
-        users_to_watch = [u for u in backend.all_users if not u.flagged][::-1]
-        for user in users_to_watch:
-            if user.type == "x":
-                url = f"https://x.com/{user.user_name}"
-            elif user.type == "bsky":
-                url = f"https://bsky.app/profile/{user.user_name}"
-            else:
-                continue
-            download_jobs.append((url, False, True, TYPE_DOWNLOAD))
-            logger.log(f"[update daemon] Added {url} to queue.")
-            time.sleep(10)
-    except Exception as e:
-        logger.log("[update daemon]", traceback.format_exc(), type="error")
-        time.sleep(10)
+    # try:
+    #     users_to_watch = [u for u in backend.all_users if not u.flagged][::-1]
+    #     for user in users_to_watch:
+    #         if user.type == "x":
+    #             url = f"https://x.com/{user.user_name}"
+    #         elif user.type == "bsky":
+    #             url = f"https://bsky.app/profile/{user.user_name}"
+    #         else:
+    #             continue
+    #         download_jobs.append((url, False, True, TYPE_DOWNLOAD))
+    #         logger.log(f"[update daemon] Added {url} to queue.")
+    #         time.sleep(10)
+    # except Exception as e:
+    #     logger.log("[update daemon]", traceback.format_exc(), type="error")
+    #     time.sleep(10)
+    logger.log("[update daemon] is deprecated.", type="warning")
 
 
 def render_markdown(text_content):
+    links = []
     # simple markdown rendering
     text_content = (
         text_content.replace("\n", "<br>")
         .replace("http://", "")
         .replace("https://", "")
+        .replace("\[", "[")
+        .replace("\]", "]")
     )
     # simple markdown link parsing [text](url)
-    text_content = re.sub(
-        r"\[([^\]]+)\]\(([^)]+)\)",
-        r'<a class="hyperlink url" href="https://\2" target="_blank">\1</a>',
-        text_content,
-    )
+    for match in re.finditer(r"\[([^\]]+)\]\(([^\)]+)\)", text_content):
+        link_text = match.group(1)
+        link_url = match.group(2)
+        links.append(link_url)
+        text_content = text_content.replace(
+            match.group(0),
+            f'<a class="hyperlink url" href="https://{link_url}" target="_blank">{link_text}</a>',
+        )
+
     text_content = re.sub(r"\-{3,}\<br\>", "<hr>", text_content)
     text_content = text_content.replace("xcancel.com/", "x.com/").replace(
         "twitter.com/", "x.com/"
@@ -680,7 +831,7 @@ def render_markdown(text_content):
 
     text_content = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text_content)
     text_content = re.sub(r"\*(.+?)\*", r"<i>\1</i>", text_content)
-    return text_content
+    return text_content, links
 
 
 def render_bbcode(text_content):
@@ -697,7 +848,9 @@ def render_bbcode(text_content):
         "[center]", '<div style="text-align:center">'
     ).replace("[/center]", "</div>")
 
-    text_content = re.sub(r"\[color\=#?([0-9a-fA-F]{3,8})\]", r'<span style="color:#\1">', text_content)
+    text_content = re.sub(
+        r"\[color\=#?([0-9a-fA-F]{3,8})\]", r'<span style="color:#\1">', text_content
+    )
     text_content = text_content.replace("[/color]", "</span>")
 
     return text_content
@@ -706,27 +859,27 @@ def render_bbcode(text_content):
 cache_embeded_link = {}
 
 
-def shorten_url(url, max_length=40):
+def shorten_url(url, max_length=30):
     if len(url) <= max_length:
         return url
-    return url[:35] + "..."
+    return url[:27] + "..."
+
 
 def tokenize_text(text):
-    tokens = re.split(
-        r"([:：；<>,，。→【】\[\]'\"‘’“”《》~!\s\n\(\)]|[^\x00-\x7F]+)", text
-    )
+    tokens = re.split(r"([\s\'\"\!\,\:\(\)：]+)", text)
     tokens = [token for token in tokens if token]
     return tokens
 
-def embed_hyperlink(type, text_content_in):
+
+def embed_hyperlink(type, text_content_in, post_id=""):
     global cache_embeded_link
-    display_link = ""
+    links = []
     if len(cache_embeded_link) > 1000:
         cache_embeded_link = {}
     if not text_content_in:
-        return "", None
-    if text_content_in in cache_embeded_link:
-        return cache_embeded_link[text_content_in]
+        return "", []
+    if (text_content_in, post_id) in cache_embeded_link:
+        return cache_embeded_link[(text_content_in, post_id)]
     if type in ["x", "bsky"]:
         text_content = (
             text_content_in.replace("http://", "")
@@ -734,35 +887,28 @@ def embed_hyperlink(type, text_content_in):
             .replace("＃", "#")
             .replace("＠", "@")
         )
-        text_content = escape(text_content)
+        # text_content = escape(text_content)
         tokens = tokenize_text(text_content)
         # logger.log(tokens)
         for i, token in enumerate(tokens):
             try:
-                if (
-                    token == "#"
-                    and i + 1 < len(tokens)
-                    and tokens[i + 1]
-                    and tokens[i + 1] != " "
-                ):
-                    token = "#" + tokens[i + 1]
-                    tokens[i + 1] = ""
-                if (
-                    token == "@"
-                    and i + 1 < len(tokens)
-                    and tokens[i + 1]
-                    and tokens[i + 1] != " "
-                ):
-                    next_token = tokens[i + 1]
-                    at_content = re.match(r"([a-zA-Z0-9\-\_\.]+)", next_token)
-                    if at_content:
-                        token = "@" + at_content.group(1)
-                        tokens[i + 1] = next_token[len(at_content.group(1)) :]
+                # if token == "#" and i + 1 < len(tokens):
+                #     next_token = tokens[i + 1]
+                #     if re.match(r"([^\#\s]+)", next_token):
+                #         token = "#" + next_token
+                #         tokens[i + 1] = ""
+                # if token == "@" and i + 1 < len(tokens):
+                #     next_token = tokens[i + 1]
+                #     at_content = re.match(r"([a-zA-Z0-9\-\_\.]+)", next_token)
+                #     if at_content:
+                #         token = "@" + at_content.group(1)
+                #         tokens[i + 1] = next_token[len(at_content.group(1)) :]
 
                 if token == "\n":
                     tokens[i] = "<br>"
                 elif token.startswith("@") and len(token) > 1:
                     # user mentions
+                    # print("Original token:", token)
                     token = token.rstrip(".")
                     token = token.replace("/", "").replace("\\", "")
                     if "." in token:
@@ -774,6 +920,9 @@ def embed_hyperlink(type, text_content_in):
                     )
                 elif token.startswith("#") and len(token) > 2:
                     if len(token) > 30:
+                        tokens[i] = token
+                        continue
+                    if token[1:].isnumeric():
                         tokens[i] = token
                         continue
                     # hashtags
@@ -845,7 +994,7 @@ def embed_hyperlink(type, text_content_in):
                         if check_allowed_to_embed(token) or check_allowed_to_probe(
                             token
                         ):
-                            display_link = token
+                            links.append(token)
                         url_shorten = shorten_url(token)
                         tokens[i] = (
                             f'<a class="hyperlink url" href="https://{token}" target="_blank">{url_shorten}</a>'
@@ -861,21 +1010,24 @@ def embed_hyperlink(type, text_content_in):
             r"furaffinity\.net/(view|journal)/\d+", text_content_in
         )
         if fa_url_match:
-            display_link = fa_url_match.group(0)
+            links.append(fa_url_match.group(0))
         # bsky urls
         bsky_url_match = re.search(
             r"bsky\.app/profile/[a-zA-Z0-9\-\_\.\:]+/post/[a-zA-Z0-9]+", text_content_in
         )
         if bsky_url_match:
-            display_link = bsky_url_match.group(0)
+            links.append(bsky_url_match.group(0))
         # x urls
         x_url_match = re.search(
             r"x\.com/[a-zA-Z0-9\-\_\.]+/status/[\d]+", text_content_in
         )
         if x_url_match:
-            display_link = x_url_match.group(0)
-        text_content = render_markdown(text_content_in)
-    elif type in ["fa", "patreon"]:
+            links.append(x_url_match.group(0))
+        text_content, _links = render_markdown(text_content_in)
+        links += _links
+    elif (
+        type in ["fa", "patreon"] or True
+    ):  # for now, try to auto embed links in all types
         text_content = text_content_in.replace("\n", "")
         soup = BeautifulSoup(text_content, "html.parser")
         for a in soup.find_all("a", href=True):
@@ -886,13 +1038,13 @@ def embed_hyperlink(type, text_content_in):
                 a["href"] = f"{config.url_base}/user/fa/{umatch}"
             elif (
                 ("twitter.com/" in href)
-                or ("/x.com/" in href)
+                or ("/x.com/" in href or href.startswith("x.com/"))
                 or ("bsky.app/profile/" in href)
             ):
                 uname_match = (
                     re.search(r"twitter.com/([a-zA-Z0-9\-\_\.]+)", href)
                     or re.search(r"x.com/([a-zA-Z0-9\-\_\.]+)", href)
-                    or re.search(r"bsky.app/profile/([a-zA-Z0-9\-\_\.]+)", href)
+                    or re.search(r"bsky.app/profile/([a-zA-Z0-9\-\_\.\:]+)", href)
                 )
                 if uname_match:
                     href = href.split("?")[0]
@@ -902,14 +1054,14 @@ def embed_hyperlink(type, text_content_in):
                         a["href"] = f"{config.url_base}/user/bsky/{token}"
                     else:
                         a["href"] = f"{config.url_base}/user/x/{token}"
-                    a.string = "@" + token
+                    # a.string = "@" + token
                     a["class"] = ["hyperlink", "iconusername"]
                     a["target"] = "_self"
             else:
                 a["target"] = "_blank"
                 a["class"] = ["auto_link", "external"]
             if check_allowed_to_embed(href) or check_allowed_to_probe(href):
-                display_link = href
+                links.append(href)
         for img in soup.find_all("img", src=True):
             src = img["src"]
             src = src.replace("http://", "").replace("https://", "").lstrip("/")
@@ -917,6 +1069,8 @@ def embed_hyperlink(type, text_content_in):
                 img["src"] = config.url_base + "/cache_proxy/" + src
             elif type == "patreon":
                 img["src"] = ""
+            elif type == "e621":
+                img["src"] = config.url_base + "/cache_proxy/https://e621.net/" + src
         for youtubeWrapper in soup.find_all(class_="youtubeWrapper"):
             youtubeIframe = youtubeWrapper.find("iframe")
             if youtubeIframe and youtubeIframe.has_attr("src"):
@@ -925,15 +1079,17 @@ def embed_hyperlink(type, text_content_in):
                 if youtubeID:
                     youtubeID = youtubeID.group(1)
                     youtube_url = f"https://www.youtube.com/watch?v={youtubeID}"
-                    display_link = youtube_url
+                    links.append(youtube_url)
             youtubeWrapper.attrs["style"] = "display:none;"
         text_content = str(soup)
         text_content = strip_suffix_list(
             text_content, ["<br>", "\n", "<br/>", "<br />", "</br>", "</h"]
         )
+    else:  # not used for now, placeholder for futher custom parsing if needed
+        text_content = text_content_in.replace("\n", "<br>")
 
-    cache_embeded_link[text_content_in] = (text_content, display_link)
-    return text_content, display_link
+    cache_embeded_link[(text_content_in, post_id)] = (text_content, links)
+    return text_content, links
 
 
 def list_and(list1, list2):
@@ -1003,7 +1159,9 @@ def probe_url(url):
             title = title.text
         else:
             title = url
-        description = soup.find("meta", {"name": "description"})
+        description = soup.find("meta", {"property": "og:description"}) or soup.find(
+            "meta", {"name": "description"}
+        )
         if description:
             description = description.attrs.get("content", "")
         else:
@@ -1046,6 +1204,45 @@ def probe_video_duration(video_path):
         return 0
 
 
+search_suggestions_cache = {}
+
+
+def build_search_suggestions():
+    global search_suggestions_cache
+    logger.log("Building search suggestions cache...")
+    search_suggestions_cache = {}
+    cursor = database.db.get_cursor()
+    cursor.execute("SELECT DISTINCT user_name FROM users")
+    for row in cursor.fetchall():
+        user_name = row[0].lower().strip()
+        if len(user_name) < 3:
+            continue
+        idx = user_name[:2]
+        search_suggestions_cache.setdefault(idx, set()).add(user_name)
+    cursor.execute("SELECT tags FROM posts")
+    for row in cursor:
+        tags = row[0].lower().strip()
+        tags = tags.split(" ") if tags else []
+        for tag in tags:
+            if len(tag) < 3:
+                continue
+            idx = tag[:2]
+            search_suggestions_cache.setdefault(idx, set()).add(tag)
+    logger.log(
+        "Built search suggestions cache with",
+        sum(len(v) for v in search_suggestions_cache.values()),
+        "entries.",
+    )
+
+def get_search_suggestions(query, limit=20):
+    global search_suggestions_cache
+    if len(query) < 2:
+        return []
+    idx = query[:2].lower()
+    suggestions = search_suggestions_cache.get(idx, set())
+    filtered = [s for s in suggestions if query in s]
+    return sorted(filtered)[:limit]
+
 def format_duration(seconds):
     if not seconds:
         return "00:00"
@@ -1058,6 +1255,7 @@ def format_duration(seconds):
         logger.log(f"Error formatting duration: {traceback.format_exc()}", type="error")
         return "00:00"
 
+
 def format_size(size_bytes):
     if size_bytes == 0:
         return "0B"
@@ -1067,3 +1265,59 @@ def format_size(size_bytes):
     i = int(math.floor(math.log(size_bytes, 1024)))
     p = math.pow(1024, i)
     return f"{round(size_bytes / p, 2)} {size_name[i]}"
+
+
+def merge_folder_contents(src_folder, dst_folder):
+    if not os.path.exists(src_folder):
+        logger.log(f"Source folder does not exist: {src_folder}", type="error")
+        return False
+    if not os.path.exists(dst_folder):
+        os.makedirs(dst_folder)
+    for item in os.listdir(src_folder):
+        src_item = os.path.join(src_folder, item)
+        dst_item = os.path.join(dst_folder, item)
+        if os.path.exists(dst_item):
+            if os.path.isdir(src_item) and os.path.isdir(dst_item):
+                merge_folder_contents(src_item, dst_item)
+            else:
+                logger.log(
+                    f"{src_item} already exists as {dst_item}, removing.",
+                    type="warning",
+                )
+                os.remove(src_item)
+        else:
+            shutil.move(src_item, dst_item)
+    # After merging, remove the source folder if it's empty
+    if os.path.exists(src_folder) and not os.listdir(src_folder):
+        os.rmdir(src_folder)
+    else:
+        logger.log(
+            f"Source folder not empty after merge, check for issues: {src_folder}",
+            type="warning",
+        )
+    return True
+
+
+def rename_user_and_fs_folder(old_uid, new_uid):
+    old_name = old_uid.split("@")[0]
+    old_type = old_uid.split("@")[1]
+    new_name = new_uid.split("@")[0]
+    new_type = new_uid.split("@")[1]
+
+    if old_type != new_type:
+        logger.log("Cannot rename user, type mismatch", type="error")
+        return False
+    old_fs_path = os.path.join(config.fs_bases[old_type], old_name)
+    new_fs_path = os.path.join(config.fs_bases[new_type], new_name)
+    if os.path.exists(new_fs_path):
+        merge_folder_contents(old_fs_path, new_fs_path)
+    else:
+        shutil.move(old_fs_path, new_fs_path)
+    database.db.rename_user(old_uid, new_uid)
+    database.db.clear_cache()
+    backend.all_users = backend.get_users()
+    logger.log(
+        f"Renamed user {old_uid} to {new_uid} and moved folder from {old_fs_path} to {new_fs_path}",
+        type="attention",
+    )
+    return True

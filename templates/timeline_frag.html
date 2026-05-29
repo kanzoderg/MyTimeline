@@ -1,0 +1,11 @@
+<div class="page_group">
+    {% for post_group in post_groups %}
+    <div class="sep_line"></div>
+    <div class="post_group">
+        {% for post in post_group %}
+        {% set user = post.user %}
+        {% include 'card.html' %}
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>

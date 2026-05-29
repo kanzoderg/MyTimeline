@@ -10,12 +10,12 @@ import logger
 os.environ["PYTHONUNBUFFERED"] = "1"
 
 # Track the currently running process for interrupt functionality
-_current_process = None
+_current_processes = set()
 
 def interrupt():
     """Interrupt the currently running command"""
-    global _current_process
-    if _current_process is None:
+    global _current_processes
+    if not _current_processes:
         logger.log("[No command running to interrupt]")
         return
     
@@ -24,14 +24,15 @@ def interrupt():
     
     try:
         # Send SIGTERM to the entire process group
-        os.killpg(os.getpgid(_current_process.pid), signal.SIGTERM)
+        for process in _current_processes:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
     except ProcessLookupError:
         pass  # Process already exited
     except Exception as e:
         logger.log(f"[Error interrupting command: {traceback.format_exc()}]", type="error")
 
 def run_command(
-    command, stop_keywords=None, stop_keywords_max_cnt=12, unbuffered=True, triggers=[]
+    command, stop_keywords=None, stop_keywords_max_cnt=12, unbuffered=True, triggers=[], tag="default"
 ):
     """
     Run a shell command and monitor its output in real-time. Stop the command if any of the stop keywords are found in the output.
@@ -55,9 +56,9 @@ def run_command(
         preexec_fn=os.setsid 
     )
     
-    global _current_process
-    _current_process = process
-    
+    global _current_processes
+    _current_processes.add(process)
+
     stop_keywords_cnt = 0
     
     def process_output(output, is_stderr=False):
@@ -66,7 +67,8 @@ def run_command(
         if not output:
             return False
         
-        prefix = "[stderr] " if is_stderr else ""
+        prefix = f"[{tag}] "
+        prefix += ("[stderr] " if is_stderr else "")
         logger.log(f"{prefix}{output.strip()}", type="warning" if is_stderr else "info")
         
         if any(keyword in output for keyword in stop_keywords):
@@ -144,7 +146,7 @@ def run_command(
         except ProcessLookupError:
             pass  # Process already exited
     finally:
-        _current_process = None
+        _current_processes.discard(process)
         process.stdout.close()
         process.stderr.close()
         try:

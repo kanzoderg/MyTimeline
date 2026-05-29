@@ -74,6 +74,27 @@ def remove_legacy_json():
                     os.remove(legacy_file)
         if os.path.exists(os.path.join(folder_path, "info.json")):
             os.remove(os.path.join(folder_path, "info.json"))
+    for folder in os.listdir(config.fs_bases["e621"]):
+        folder_path = os.path.join(config.fs_bases["e621"], folder)
+        if not os.path.isdir(folder_path):
+            continue
+        for file in os.listdir(folder_path):
+            match = re.search(r"(\d+)_", file)
+            if match and file.endswith(".json"):
+                legacy_file = os.path.join(folder_path, file)
+                new_json = f"{match.group(1)}.json"
+                new_file = os.path.join(folder_path, new_json)
+                if os.path.exists(new_file) and new_file != legacy_file:
+                    print(
+                        "File already exists: "
+                        + new_json
+                        + " so safe to remove "
+                        + file
+                    )
+                    print(legacy_file + " -> " + new_file)
+                    os.remove(legacy_file)
+        if os.path.exists(os.path.join(folder_path, "info.json")):
+            os.remove(os.path.join(folder_path, "info.json"))
 
 
 def drop_table_users():
@@ -119,6 +140,9 @@ def sanity_check():
         if not type_:
             print(f"There is a entry with empty type: {uid}, skipping.")
             continue
+        if not type_ in config.fs_bases:
+            print(f"Unknown type {type_} for user {uid}, skipping.")
+            continue
         user_fs_base = os.path.join(config.fs_bases[type_], user)
         if not os.path.exists(user_fs_base):
             suggestions.add(
@@ -139,6 +163,9 @@ def sanity_check():
                 files_list[file].append(uid)
             else:
                 files_list[file] = [uid]
+    if not type_ in ["x", "bsky"]:
+        print(f"Type {type_} is not x or bsky, skipping duplicate user check.")
+        return
     for file, users_with_file in files_list.items():
         if file in [
             "info.json",
@@ -148,7 +175,7 @@ def sanity_check():
             "banner_bck",
             "user.json",
             "extend.txt",
-            "profile.json"
+            "profile.json",
         ]:
             continue
         if not file.split(".")[-1] in [
@@ -169,9 +196,14 @@ def sanity_check():
         if len(users_with_file) > 1:
             # print(f"File {file} is shared by {users_with_file}")
             if not tuple(users_with_file) in duplicated_users:
-                types = [ uid.split("@")[1] if "@" in uid else "unknown" for uid in users_with_file]
+                types = [
+                    uid.split("@")[1] if "@" in uid else "unknown"
+                    for uid in users_with_file
+                ]
                 if len(set(types)) > 1:
-                    print(f"File {file} is shared by users from different sources: {users_with_file}, skipping suggestion.")
+                    print(
+                        f"File {file} is shared by users from different sources: {users_with_file}, skipping suggestion."
+                    )
                     continue
                 if not types[0] in ["x", "bsky"]:
                     continue
@@ -563,7 +595,7 @@ def fs_format_fix():
             user_path = os.path.join(config.fs_bases[type_], user)
             if not os.path.isdir(user_path):
                 continue
-            correct_user = user.lower()
+            correct_user = user.lower().replace(" ", "_").replace("@", "[at]")
             if user != correct_user:
                 correct_user_path = os.path.join(config.fs_bases[type_], correct_user)
                 if os.path.exists(correct_user_path):

@@ -9,9 +9,23 @@
     <a class="toggle toggle_selected" href="{{sorted_posts[0].url}}" target="_blank">Original Post</a>
 </div>
 {% else %}
-{% for post_id in sorted_posts_ids %}
-{% set post = posts[post_id] %}
-{% set user = users[post.user_name] %}
-{% include 'card.html' %}
-{% endfor %}
+
+<div class="post_group">
+    <!-- there should be only one post_group -->
+    {% for post in post_groups[0] %}
+    {% set user = post.user %}
+    {% include 'card.html' %}
+    {% endfor %}
+</div>
+
+
 {% endif %}
+<script>
+    window.addEventListener('load', function () {
+        focusHighlighted();
+        document.querySelectorAll('.post_group').forEach(el => {
+            offscreen_observer.observe(el);
+            height_observer.observe(el);
+        });
+    });
+</script>

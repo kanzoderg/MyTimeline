@@ -16,30 +16,35 @@
     data-post-id="{{post.post_id}}">
     {% include 'card_content.html' %}
     <div class="card_body">
-        {% if post.embed %}
+        {% for embed_obj in post.embed_objs %}
+        {% set parent_post = post %}
+        {% set post = embed_obj %}
         <div class="card_embed">
-            {% if post.embed_obj.is_external %}
-            <a class="card_embed_url" href="{{post.embed_obj.url}}" target="_blank">
+            {% if post.is_external %}
+            <a class="card_embed_url" href="{{post.url}}" target="_blank">
                 <img class="card_embed_img" src="{{url_base}}/img/external.svg" />
+                <span class="card_embed_url_txt">{{post.url.split('://')[-1]}}</span>
             </a>
-            {% else %}
-            {% set parent_post = post %}
-            {% set post = post.embed_obj %}
+            {% elif parent_post.type == 'e621' or post.embed_objs | length > 1 %} <!-- use tiny card for e621 embeds -->
+            {% include 'card_tiny.html' %}
+            {% else %} <!-- for other embeds, use normal card content -->
             {% include 'card_content.html' %}
-            {% set post = parent_post %}
             {% endif %}
         </div>
-        {% endif %}
+        {% set post = parent_post %}
+        {% endfor %}
 
         {% if post.post_id == highlight_post_id %}
-        <a class="big_btn upload_file_btn" href="{{url_base}}/upload/{{post.type}}/{{post.user_name}}/{{post.post_id}}"
-            target="_blank">
-            <img class="inline_icon" src="{{url_base}}/img/upload.svg" /> Upload File
-        </a>
+        <div class="card_embed">
+            <a class="card_embed_url" href="{{url_base}}/upload/{{post.type}}/{{post.user_name}}/{{post.post_id}}"
+                target="_blank">
+                <img class="card_embed_img" src="{{url_base}}/img/upload.svg" />
+                <span class="card_embed_url_txt">Add File/Link</span>
+            </a>
+        </div>
         {% endif %}
-
-        {% include 'card_footer.html' %}
     </div>
+    {% include 'card_footer.html' %}
     {% if post.reply_to %}
     <!-- <div class="reply_to_deco_side"></div> -->
     {% endif %}
@@ -55,12 +60,16 @@
 {% else %}
 {% set class_list = 'placeholder_card' %}
 {% endif %}
+{% if post.reply_to_id %}
+{% set class_list = class_list + ' post_reply' %}
+{% endif %}
 
-<div class="card {{class_list}}" data-post-id="{{post.post_id}}">
+<div class="card {{class_list}}" id="p{{post.post_id}}" data-post-id="{{post.post_id}}" data-reply-to-id="{{post.reply_to_id}}">
     <div class="card_body">
         <div class="card_embed">
             <a class="card_embed_url" href="{{post.url}}" target="_blank">
                 <img class="card_embed_img" src="{{url_base}}/img/external.svg" />
+                <span class="card_embed_url_txt">{{post.url.split('://')[-1]}}</span>
             </a>
         </div>
     </div>

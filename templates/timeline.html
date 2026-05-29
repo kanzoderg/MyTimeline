@@ -1,7 +1,7 @@
 <div class="timeline_toggle_bar">
     {% if section != "fav" %}
-    <select name="sort_toggle" class="sort_toggle" {%if section=='user'%}style="right:0.5rem"{%endif%} 
-        onchange="location.href='{{page_url}}?tab=posts&sort_type='+this.value{%if q%}+'&q={{q}}'{% endif %};show_loading_icon();"
+    <select name="sort_toggle" class="sort_toggle" {%if section=='user' %}style="right:0.5rem" {%endif%}
+        onchange="location.href='{{page_url}}?tab={{tab}}&sort_type='+this.value{%if q%}+'&q={{q}}'{% endif %};show_loading_icon();"
         tabindex="-1">
         <option value="new" {% if sort_type=="new" %}selected{% endif %}>New</option>
         <option value="top" {% if sort_type=="top" %}selected{% endif %}>Top</option>
@@ -11,7 +11,7 @@
     </select>
     <!-- <img src="{{url_base}}/img/down.svg" class="select_deco"> -->
     {% endif %}
-    
+
     {% if section=='tl' %}
     <div class="tl_deco"><img src="{{url_base}}/img/timeline.svg" /></div>
     {% elif section=='fav' %}
@@ -19,16 +19,16 @@
     {% endif %}
 
     <div class="media_toggle">
-        <a class="toggle toggle_selected"
+        <a class="toggle {% if tab=='posts' %}toggle_selected{% endif %}"
             href="{{page_url}}?tab=posts&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Posts</a>
-        <a class="toggle"
+        <a class="toggle {% if tab=='media' %}toggle_selected{% endif %}"
             href="{{page_url}}?tab=media&sort_type={{sort_type}}{%if q%}&q={{q}}{% endif %}{%if p%}&p={{p}}{% endif %}">Media</a>
         {% if user_name %}
         <!-- <a class="toggle" href="{{url_base}}/shorts?uid={{user_name}}@{{type}}">Videos</a> -->
         {% endif %}
     </div>
-    <div class="sep_line"></div>
 </div>
+
 
 {% if sorted_posts_ids | length == 0 and user_name %}
 <div class="notice_card">
@@ -38,12 +38,12 @@
     update button above.
 </div>
 {% if type == 'x' %}
-<a class="user_button" href="{{users[user_name].url}}" target="_blank">
+<a class="user_button" href="{{anchor_user.url}}" target="_blank">
     <img src="{{url_base}}/img/x.svg" />
     <span>Open on X</span>
 </a>
 {% elif type == 'bsky' %}
-<a class="user_button" href="{{users[user_name].url}}" target="_blank">
+<a class="user_button" href="{{anchor_user.url}}" target="_blank">
     <img src="{{url_base}}/img/bsky.svg" />
     <span>Open on Bluesky</span>
 </a>
@@ -64,9 +64,13 @@
 </div>
 {% endif %}
 
-{% for post_id in sorted_posts_ids %}
-{% set post = posts[post_id] %}
-{% set user = users[post.user_name] %}
-{% include 'card.html' %}
-{% endfor %}
-<script src="{{url_base}}/js/noreferer.js"></script>
+{% if tab=='posts' %}
+{% include 'timeline_frag.html' %}
+{% elif tab=='media' %}
+<div class="page_group">
+    {% include 'mediagrid_frag.html' %}
+</div>
+{% endif %}
+
+
+<script src="{{url_base}}/js/tl.js"></script>

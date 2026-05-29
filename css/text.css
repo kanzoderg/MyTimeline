@@ -10,12 +10,15 @@
     border-radius: 0.4rem;
 }
 
+body {
+    background-color: #222;
+}
+
 .text_viewer {
     display: block;
     padding-top: 3rem;
     padding-bottom: 3rem;
     width: 100%;
-    background-color: #222;
 }
 
 .text_container {

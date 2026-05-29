@@ -8,6 +8,7 @@ downloads/
 *debug*
 
 *cookies.txt
+*cookies.json
 tmp/
 *.db
 *.db-journal
